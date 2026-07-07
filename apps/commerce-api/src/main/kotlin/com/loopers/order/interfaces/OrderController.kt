@@ -6,6 +6,7 @@ import com.loopers.order.application.OrderFacade
 import com.loopers.order.application.OrderInfo
 import com.loopers.order.application.OrderLineCommand
 import com.loopers.order.domain.OrderStatus
+import com.loopers.queue.application.OrderQueueService
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestAttribute
 import org.springframework.web.bind.annotation.RequestBody
@@ -16,13 +17,19 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/orders")
 class OrderController(
     private val orderFacade: OrderFacade,
+    private val orderQueueService: OrderQueueService,
 ) {
+    // 토큰 검증은 Tx 밖(진입부)에서, 소모(DEL)는 주문 생성 성공 후에만 — 실패 시 토큰이 남아 TTL 안에서 재시도 가능
     @PostMapping
     fun order(
         @RequestAttribute(ACCOUNT_ID) userId: Long,
         @RequestBody request: OrderCreateRequest,
-    ): OrderCreateResponse =
-        OrderCreateResponse.from(orderFacade.place(request.toCommand(userId)))
+    ): OrderCreateResponse {
+        orderQueueService.verifyAdmission(userId)
+        val info = orderFacade.place(request.toCommand(userId))
+        orderQueueService.completeOrder(userId)
+        return OrderCreateResponse.from(info)
+    }
 }
 
 data class OrderCreateRequest(

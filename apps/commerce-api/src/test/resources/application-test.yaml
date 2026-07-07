@@ -24,3 +24,7 @@ outbox:
 coupon:
   issue-consumer:
     auto-startup: false
+
+queue:
+  scheduler:
+    enabled: false
