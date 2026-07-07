@@ -42,8 +42,6 @@ class OrderQueueRepository(
         const val QUEUE_KEY = "queue:orders"
         const val TOKEN_KEY_PREFIX = "entry-token:"
 
-        // ZPOPMIN(꺼냄)과 SET(토큰 발급) 사이에 장애가 끼면 대기열에도 토큰에도 없는 유저가 생기므로
-        // 두 동작을 한 스크립트로 묶는다. 토큰 키를 스크립트 안에서 조립하므로 비클러스터 전제.
         private val ADMIT_SCRIPT: DefaultRedisScript<List<*>> = DefaultRedisScript(
             """
             local popped = redis.call('ZPOPMIN', KEYS[1], tonumber(ARGV[1]))

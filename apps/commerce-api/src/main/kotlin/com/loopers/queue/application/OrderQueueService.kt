@@ -45,7 +45,6 @@ class OrderQueueService(
         orderQueueRepository.deleteToken(userId)
     }
 
-    // 차례가 가까울수록 촘촘하게 폴링하도록 서버가 다음 조회 시점을 지정한다 (대기 인원 전체의 폴링 총량 제어)
     private fun nextPollSeconds(estimatedWaitSeconds: Long): Long = (estimatedWaitSeconds / 10).coerceIn(1, 10)
 }
 

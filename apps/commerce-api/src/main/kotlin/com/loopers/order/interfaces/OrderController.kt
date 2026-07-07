@@ -19,7 +19,6 @@ class OrderController(
     private val orderFacade: OrderFacade,
     private val orderQueueService: OrderQueueService,
 ) {
-    // 토큰 검증은 Tx 밖(진입부)에서, 소모(DEL)는 주문 생성 성공 후에만 — 실패 시 토큰이 남아 TTL 안에서 재시도 가능
     @PostMapping
     fun order(
         @RequestAttribute(ACCOUNT_ID) userId: Long,

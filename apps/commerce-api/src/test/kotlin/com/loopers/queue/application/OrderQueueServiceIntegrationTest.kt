@@ -136,7 +136,6 @@ class OrderQueueServiceIntegrationTest @Autowired constructor(
 
         scheduler.admit()
 
-        // 같은 ms 진입은 사전순으로 갈리므로 "누가" 뽑혔는지가 아니라 "몇 명" 뽑혔는지를 검증한다
         assertAll(
             { assertThat(orderQueueRepository.totalWaiting()).isEqualTo(7L) },
             { assertThat((1L..10L).mapNotNull { orderQueueRepository.findToken(it) }).hasSize(3) },
