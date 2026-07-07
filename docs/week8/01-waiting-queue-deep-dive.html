@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>대기열 시스템 딥다이브 — 아키텍처 · 입장 제어 · 토큰 · 공정성 · 운영</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --blue:#3182F6; --blue-deep:#1B64DA; --blue-bg:#E8F3FF; --blue-bg2:#F4F9FF;
+    --green:#15C47E; --green-deep:#0A8F5B; --green-bg:#E7F9F1;
+    --red:#F04452; --red-deep:#C9303C; --red-bg:#FEEFEF;
+    --g900:#191F28; --g800:#333D4B; --g700:#4E5968; --g600:#6B7684;
+    --g500:#8B95A1; --g400:#B0B8C1; --g300:#D1D6DB; --g200:#E5E8EB;
+    --g100:#F2F4F6; --g50:#F9FAFB; --white:#fff;
+    --sans:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --shadow:0 1px 3px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.05);
+    --shadow-sm:0 1px 3px rgba(0,0,0,.05);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--g100);color:var(--g700);
+    font-family:var(--sans);font-weight:400;font-size:17px;line-height:1.72;
+    -webkit-font-smoothing:antialiased;letter-spacing:-.01em}
+  ::selection{background:var(--blue-bg);color:var(--blue-deep)}
+  #bar{position:fixed;top:0;left:0;height:3px;width:0;z-index:50;background:var(--blue);
+    border-radius:0 3px 3px 0;transition:width .08s linear}
+  .sheet{max-width:860px;margin:40px auto;background:var(--white);
+    border-radius:28px;box-shadow:var(--shadow);overflow:hidden}
+  header.cover{padding:64px 56px 52px;border-bottom:1px solid var(--g100)}
+  .badge{display:inline-flex;align-items:center;gap:7px;background:var(--blue-bg);
+    color:var(--blue-deep);font-size:13px;font-weight:700;padding:8px 14px;border-radius:100px;
+    margin-bottom:26px}
+  .badge .d{width:6px;height:6px;border-radius:50%;background:var(--blue)}
+  h1.title{font-size:clamp(34px,5.6vw,52px);font-weight:800;line-height:1.18;
+    letter-spacing:-.035em;color:var(--g900);margin:0 0 22px}
+  h1.title .hl{color:var(--blue)}
+  .lede{font-size:19px;line-height:1.6;color:var(--g600);font-weight:500;max-width:640px;margin:0 0 36px}
+  .lede b{color:var(--g800);font-weight:700}
+  .chips{display:flex;flex-wrap:wrap;gap:10px}
+  .chip{background:var(--g50);border:1px solid var(--g200);border-radius:14px;padding:12px 16px;font-size:13px}
+  .chip .k{font-weight:700;color:var(--g500);font-size:11px;letter-spacing:.02em;display:block;margin-bottom:3px}
+  .chip .v{color:var(--g700);font-weight:600}
+  nav.toc{padding:40px 56px;background:var(--g50);border-bottom:1px solid var(--g100)}
+  nav.toc h2{font-size:13px;font-weight:700;color:var(--g500);margin:0 0 18px;letter-spacing:.02em}
+  nav.toc ol{margin:0;padding:0;list-style:none;counter-reset:t;display:grid;
+    grid-template-columns:1fr 1fr;gap:8px 18px}
+  nav.toc li{counter-increment:t}
+  nav.toc a{display:flex;align-items:center;gap:13px;padding:12px 14px;border-radius:14px;
+    color:var(--g800);text-decoration:none;font-size:15px;font-weight:600;
+    background:var(--white);border:1px solid var(--g200);transition:.18s}
+  nav.toc a::before{content:counter(t,decimal-leading-zero);font-family:var(--mono);font-size:12px;
+    font-weight:700;color:var(--blue);background:var(--blue-bg);border-radius:8px;
+    width:28px;height:28px;display:grid;place-items:center;flex:none}
+  nav.toc a:hover{border-color:var(--blue);color:var(--blue-deep);transform:translateY(-2px);box-shadow:var(--shadow-sm)}
+  main{padding:0 56px}
+  section{padding:56px 0 18px;border-top:1px solid var(--g100)}
+  section:first-child{border-top:none}
+  .sec-head{display:flex;align-items:center;gap:16px;margin-bottom:26px}
+  .sec-num{font-family:var(--mono);font-size:17px;font-weight:700;color:var(--white);
+    background:var(--blue);border-radius:14px;width:46px;height:46px;display:grid;place-items:center;flex:none;
+    box-shadow:0 4px 12px rgba(49,130,246,.3)}
+  .sec-eyebrow{font-size:12.5px;font-weight:700;color:var(--blue);letter-spacing:.04em;margin:0 0 3px}
+  h2.sec{font-size:clamp(25px,3.6vw,32px);font-weight:800;letter-spacing:-.03em;
+    line-height:1.25;color:var(--g900);margin:0}
+  h3{font-size:19px;font-weight:700;color:var(--g900);margin:34px 0 12px;
+    display:flex;align-items:center;gap:10px}
+  h3::before{content:"";width:5px;height:18px;border-radius:3px;background:var(--blue);flex:none}
+  p{margin:0 0 18px}
+  .lead{font-size:18.5px;line-height:1.6;color:var(--g800);font-weight:600}
+  strong{font-weight:700;color:var(--g900)}
+  em{font-style:normal;font-weight:600;color:var(--g800)}
+  .term{font-family:var(--mono);font-size:.82em;background:var(--g100);color:var(--blue-deep);
+    padding:3px 7px;border-radius:7px;font-weight:500;white-space:nowrap}
+  a.cite{font-family:var(--mono);font-size:10.5px;color:var(--blue);text-decoration:none;
+    vertical-align:super;line-height:0;font-weight:700;padding:0 1px}
+  blockquote{margin:32px 0;padding:28px 30px;background:var(--blue-bg2);border-radius:20px;
+    border:1px solid var(--blue-bg)}
+  blockquote p{font-size:20px;font-weight:700;line-height:1.5;color:var(--blue-deep);margin:0 0 12px;letter-spacing:-.02em}
+  blockquote cite{font-family:var(--mono);font-style:normal;font-size:12px;color:var(--g500);
+    display:block;font-weight:500}
+  .note{border-radius:18px;padding:22px 24px;margin:26px 0;font-size:15.5px;line-height:1.7;
+    background:var(--g50);border:1px solid var(--g200);color:var(--g700)}
+  .note .tag{font-size:12px;font-weight:700;display:block;margin-bottom:8px;color:var(--g500)}
+  .note strong{color:var(--g900)}
+  .note.key{background:var(--blue-bg);border-color:#cfe4ff}
+  .note.key .tag{color:var(--blue-deep)} .note.key strong{color:var(--blue-deep)}
+  .note.warn{background:var(--red-bg);border-color:#f8d4d4}
+  .note.warn .tag{color:var(--red-deep)} .note.warn strong{color:var(--red-deep)}
+  .note.q{background:var(--blue-bg2);border-color:var(--blue-bg)}
+  .note.q .tag{color:var(--blue-deep)} .note.q strong{color:var(--blue-deep)}
+  .note.q .ask{font-size:18px;font-weight:700;color:var(--blue-deep);letter-spacing:-.02em;
+    display:block;margin-bottom:8px;line-height:1.45}
+  figure{margin:36px 0}
+  .fig-box{position:relative;background:var(--g50);border:1px solid var(--g200);border-radius:22px;
+    padding:32px 26px 22px}
+  .fig-box::after{content:attr(data-fig);position:absolute;top:16px;right:20px;font-family:var(--mono);
+    font-size:10.5px;font-weight:700;color:var(--g400);letter-spacing:.1em}
+  figcaption{font-size:13.5px;color:var(--g500);margin-top:16px;text-align:center;
+    line-height:1.6;font-weight:500}
+  figcaption b{color:var(--g700);font-weight:700}
+  svg{display:block;width:100%;height:auto}
+  .svg-t{font-family:var(--sans);font-weight:700;font-size:14px}
+  .svg-s{font-family:var(--mono);font-size:11px;font-weight:500}
+  .svg-l{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.02em}
+  svg foreignObject>.fo{height:100%;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;padding:5px 12px;box-sizing:border-box;
+    overflow:hidden;line-height:1.25;word-break:keep-all}
+  svg foreignObject>.fo .t{font-family:var(--sans);font-weight:700;font-size:14px;color:var(--g900)}
+  svg foreignObject>.fo .s{font-family:var(--mono);font-weight:500;font-size:11px;color:var(--g600);margin-top:2px}
+  svg foreignObject>.fo.blue .t{color:var(--blue-deep)} svg foreignObject>.fo.blue .s{color:var(--blue)}
+  svg foreignObject>.fo.green .t{color:var(--green-deep)} svg foreignObject>.fo.green .s{color:var(--green-deep)}
+  svg foreignObject>.fo.red .t{color:var(--red-deep)} svg foreignObject>.fo.red .s{color:var(--red-deep)}
+  svg foreignObject>.fo.grey .t{color:var(--g800)} svg foreignObject>.fo.grey .s{color:var(--g600)}
+  .sheet:has(.fig-wide){overflow:visible}
+  figure.fig-wide{width:min(1180px,94vw);position:relative;left:50%;transform:translateX(-50%)}
+  @media(max-width:760px){figure.fig-wide{width:100%;left:auto;transform:none}}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:26px 0}
+  .col{border-radius:20px;padding:22px 24px;border:1px solid var(--g200);transition:.2s}
+  .col:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+  .col.x{background:var(--g50)}
+  .col.o{background:var(--blue-bg);border-color:#cfe4ff}
+  .col h4{margin:0 0 10px;font-size:15.5px;font-weight:800;display:flex;align-items:center;gap:9px;color:var(--g900)}
+  .col.o h4{color:var(--blue-deep)}
+  .col h4 .mk{font-family:var(--mono);font-size:11px;font-weight:700;padding:4px 9px;border-radius:8px;
+    background:var(--g200);color:var(--g600);flex:none}
+  .col.o h4 .mk{background:var(--blue);color:#fff}
+  .col p{font-size:14.5px;line-height:1.65;margin:0;color:var(--g700);font-weight:500}
+  .tbl-wrap{margin:26px 0;border:1px solid var(--g200);border-radius:20px;overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:14.5px}
+  thead{background:var(--g50)}
+  th,td{text-align:left;padding:14px 18px;vertical-align:top}
+  th{font-size:12px;font-weight:700;color:var(--g500);letter-spacing:.01em}
+  td{border-top:1px solid var(--g100);font-weight:500;color:var(--g700)}
+  tbody tr:hover{background:var(--blue-bg2)}
+  td:first-child{font-weight:700;color:var(--g900);white-space:nowrap}
+  .checklist{list-style:none;margin:24px 0;padding:0}
+  .checklist li{position:relative;display:block;padding:13px 16px 13px 48px;margin-bottom:8px;
+    background:var(--g50);border:1px solid var(--g200);border-radius:14px;font-size:15px;
+    line-height:1.62;color:var(--g700);font-weight:500}
+  .checklist li .box{position:absolute;left:16px;top:14px;width:20px;height:20px;border-radius:6px;
+    border:2px solid var(--g300);background:var(--white)}
+  .checklist li.done{background:var(--blue-bg);border-color:#cfe4ff}
+  .checklist li.done .box{background:var(--blue);border-color:var(--blue)}
+  .checklist li.done .box::after{content:"";position:absolute;left:5px;top:1px;width:6px;height:11px;
+    border:solid #fff;border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
+  .checklist li .tag{float:right;font-family:var(--mono);font-size:10.5px;font-weight:700;
+    color:var(--g500);background:var(--g100);padding:3px 9px;border-radius:7px;margin-left:10px}
+  .checklist li.must .tag{color:var(--blue-deep);background:#d8e9ff}
+  .checklist li b{color:var(--g900);font-weight:700}
+  .checklist li .term{white-space:normal}
+  .docnav{display:flex;flex-wrap:wrap;gap:8px;padding:20px 56px;background:var(--white);
+    border-bottom:1px solid var(--g100)}
+  .docnav a{font-family:var(--mono);font-size:12.5px;font-weight:700;text-decoration:none;
+    padding:9px 14px;border-radius:100px;background:var(--g50);border:1px solid var(--g200);
+    color:var(--g600);transition:.18s}
+  .docnav a:hover{border-color:var(--blue);color:var(--blue-deep);transform:translateY(-1px)}
+  .docnav a.cur{background:var(--blue-bg);border-color:#cfe4ff;color:var(--blue-deep)}
+  .docnav a .n{color:var(--g400);margin-right:6px}
+  .docnav a.cur .n{color:var(--blue)}
+  .ref{display:flex;align-items:flex-start;gap:13px;text-decoration:none;margin:8px 0;
+    padding:14px 18px;border-radius:14px;background:var(--g50);border:1px solid var(--g200);transition:.18s}
+  .ref:hover{border-color:var(--blue);transform:translateX(3px);box-shadow:var(--shadow-sm)}
+  .ref .no{flex:none;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--blue);
+    background:var(--blue-bg);border-radius:7px;padding:3px 8px;margin-top:2px}
+  .ref .h{font-size:14px;font-weight:700;color:var(--g900);line-height:1.45;display:block}
+  .ref .src{font-family:var(--mono);font-size:11px;color:var(--g500);display:block;margin-top:3px;word-break:break-all}
+  footer{padding:48px 56px 56px;color:var(--g500);font-family:var(--mono);font-size:11.5px;
+    text-align:center;line-height:1.9;border-top:1px solid var(--g100);font-weight:500}
+  footer .gl{display:block;font-size:26px;margin-bottom:14px;color:var(--g300)}
+  @media(max-width:720px){
+    body{font-size:16px}
+    .sheet{margin:0;border-radius:0}
+    header.cover,nav.toc,main,footer,.docnav{padding-left:24px;padding-right:24px}
+    nav.toc ol,.cols{grid-template-columns:1fr}
+    header.cover{padding-top:48px}
+  }
+  @media(prefers-reduced-motion:no-preference){
+    .fade{opacity:0;transform:translateY(18px);transition:opacity .6s cubic-bezier(.16,1,.3,1),transform .6s cubic-bezier(.16,1,.3,1)}
+    .fade.in{opacity:1;transform:none}
+    .cov>*{opacity:0;transform:translateY(16px);animation:rise .7s cubic-bezier(.16,1,.3,1) forwards}
+    .cov>*:nth-child(1){animation-delay:.04s} .cov>*:nth-child(2){animation-delay:.12s}
+    .cov>*:nth-child(3){animation-delay:.22s} .cov>*:nth-child(4){animation-delay:.34s}
+    @keyframes rise{to{opacity:1;transform:none}}
+  }
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<div class="sheet">
+
+  <header class="cover">
+    <div class="cov">
+      <span class="badge"><span class="d"></span>ROUND 8 · 딥다이브 리서치</span>
+      <h1 class="title">대기열 시스템,<br><span class="hl">실무는 어떻게 만드는가</span></h1>
+      <p class="lede">AWS·Cloudflare·Queue-it·SeatGeek·국내 티켓팅(NetFUNNEL)·한국 커머스 사례를 교차 조사해, 대기열 설계의 <b>5개 결정축 — 아키텍처 · 입장 제어 · 토큰 · 피드백 · 공정성</b> — 을 MECE하게 정리했습니다. 과제 범위(Redis Sorted Set) 바깥에서 실무가 무엇을 더 고려하는지가 이 문서의 초점입니다.</p>
+      <div class="chips">
+        <div class="chip"><span class="k">조사 방식</span><span class="v">멀티소스 교차 검증</span></div>
+        <div class="chip"><span class="k">레퍼런스</span><span class="v">23개 (실재 URL 확인)</span></div>
+        <div class="chip"><span class="k">핵심 질문</span><span class="v">시간 기반 vs 인원 수 기반</span></div>
+        <div class="chip"><span class="k">작성</span><span class="v">2026-07-07</span></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="docnav">
+    <a href="00-requirements.html"><span class="n">00</span>요구사항</a>
+    <a class="cur" href="01-waiting-queue-deep-dive.html"><span class="n">01</span>딥다이브</a>
+    <a href="02-user-journey.html"><span class="n">02</span>유저 저니</a>
+    <a href="03-architecture-options.html"><span class="n">03</span>아키텍처 3안</a>
+    <a href="checklist.md"><span class="n">—</span>구현 체크리스트</a>
+    <a href="experiments/WRITING-LOG.md"><span class="n">—</span>Writing Log</a>
+  </div>
+
+  <nav class="toc">
+    <h2>목차</h2>
+    <ol>
+      <li><a href="#s1">전체 지도 — 대기열의 5개 결정축</a></li>
+      <li><a href="#s2">아키텍처 패턴 4종 — 어디에 대기열을 두는가</a></li>
+      <li><a href="#s3">입장 제어 — 시간 기반 vs 인원 수 기반</a></li>
+      <li><a href="#s4">입장 토큰 설계 — 포맷 · TTL · 슬롯 회수</a></li>
+      <li><a href="#s5">순번 피드백 — Polling이 기본인 이유</a></li>
+      <li><a href="#s6">공정성 — FIFO의 함정과 4가지 대안</a></li>
+      <li><a href="#s7">어뷰징 · 봇 — 대기열이 뚫리는 방식</a></li>
+      <li><a href="#s8">운영 — Thundering Herd · 장애 · 지표</a></li>
+      <li><a href="#s9">한국 실무 사례 — 대기열 vs 수량 통제</a></li>
+      <li><a href="#s10">R8 설계 시사점</a></li>
+      <li><a href="#s11">참고문헌</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+  <!-- ===================== S1 ===================== -->
+  <section id="s1" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">1</div>
+      <div><p class="sec-eyebrow">THE MAP</p><h2 class="sec">전체 지도 — 대기열의 5개 결정축</h2></div>
+    </div>
+
+    <p class="lead">조사한 모든 구현(AWS, Cloudflare, Queue-it, SeatGeek, NetFUNNEL, 자체 구축)은 결국 같은 5개 질문에 답하는 서로 다른 방식이었습니다. 이 축으로 보면 어떤 대기열이든 분해됩니다.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>결정축</th><th>질문</th><th>대표 선택지</th></tr></thead>
+        <tbody>
+          <tr><td>① 아키텍처</td><td>대기열을 어느 레이어에 두는가</td><td>앱 자체구축(Redis) / 클라우드 레퍼런스 / CDN·엣지 SaaS / 메시지큐 버퍼링</td></tr>
+          <tr><td>② 입장 제어</td><td>누구를 언제 들여보내는가</td><td>시간 기반(rate) / 인원 수 기반(slot) / 하이브리드</td></tr>
+          <tr><td>③ 토큰</td><td>입장 허가를 어떻게 증명·회수하는가</td><td>JWT / 서명 쿠키 / opaque 키 · sliding vs absolute TTL</td></tr>
+          <tr><td>④ 피드백</td><td>대기 중 상태를 어떻게 알려주는가</td><td>Polling(+jitter) / SSE / WebSocket · 예상 대기시간 산식</td></tr>
+          <tr><td>⑤ 공정성</td><td>순서는 무엇 기준으로 공정한가</td><td>FIFO / Random / Pre-queue 추첨 / 봇 격리</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note key">
+      <span class="tag">과제와의 관계</span>
+      R8 과제는 이 지도에서 <strong>① 앱 자체구축(Redis Sorted Set) · ② 시간 기반 스케줄러 · ③ opaque 토큰+TTL · ④ Polling · ⑤ FIFO</strong> 조합 하나를 구현하는 것입니다. 나머지 선택지들은 "왜 이 조합인가"를 설명할 때의 비교 대상이고, 그 비교가 Technical Writing의 재료가 됩니다.
+    </div>
+  </section>
+
+  <!-- ===================== S2 ===================== -->
+  <section id="s2" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">2</div>
+      <div><p class="sec-eyebrow">ARCHITECTURE PATTERNS</p><h2 class="sec">아키텍처 패턴 4종 — 어디에 대기열을 두는가</h2></div>
+    </div>
+
+    <p class="lead">대기열은 <strong>보호 대상보다 앞</strong>에 있어야 합니다. "얼마나 앞"인지에 따라 4개 패턴이 갈립니다 — 앱 레이어(자체 구축) → 클라우드 인프라 → CDN·엣지 → 아예 요청 자체를 큐로.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>패턴</th><th>대표 구현</th><th>상태 저장</th><th>장점</th><th>한계</th></tr></thead>
+        <tbody>
+          <tr><td>앱 자체구축</td><td>Redis Sorted Set (우리 과제)</td><td>Redis (ZADD/ZRANK/ZPOPMIN)</td><td>풀 컨트롤, 도메인 결합 쉬움, 저비용</td><td>대기열 자체도 우리 앱·Redis 용량 안에서 살아야 함</td></tr>
+          <tr><td>클라우드 레퍼런스</td><td>AWS Virtual Waiting Room<a class="cite" href="#r1">[1]</a><a class="cite" href="#r2">[2]</a></td><td>Redis 카운터 + DynamoDB 토큰 (하이브리드)</td><td>SQS 배칭으로 진입 폭주 흡수, serving counter 모델 정립</td><td>⚠️ 2025-11 deprecated — 패턴 참고용</td></tr>
+          <tr><td>CDN·엣지 SaaS</td><td>Cloudflare Waiting Room<a class="cite" href="#r5">[5]</a> · Queue-it<a class="cite" href="#r14">[14]</a> · NetFUNNEL<a class="cite" href="#r19">[19]</a></td><td>엣지 분산 상태 + 암호화 쿠키</td><td>원 서버에 트래픽이 닿기 전에 차단, 코드 수정 최소</td><td>비용, 세밀한 도메인 결합 어려움, 벤더 종속</td></tr>
+          <tr><td>메시지큐 버퍼링</td><td>Kafka 지연 처리 (R7 쿠폰 · 여기어때<a class="cite" href="#r16">[16]</a> · 토스<a class="cite" href="#r18">[18]</a>)</td><td>토픽 (파티션 순서)</td><td>처리량 제어 확실, 유실 방지</td><td><strong>순번 실시간 조회가 없음</strong> — fire &amp; forget<a class="cite" href="#r4">[4]</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>AWS 레퍼런스의 두 가지 교훈 (deprecated여도 남는 것)</h3>
+    <p>AWS 공식 솔루션은 폐기됐지만(현 권장은 CloudFront Functions 기반 방문자 우선순위화<a class="cite" href="#r2">[2]</a>), 설계 두 가지는 여전히 표준입니다.</p>
+    <p><strong>(a) 진입조차 비동기로.</strong> 대기열 진입 요청을 즉시 처리하지 않고 SQS에 넣어 Lambda가 <em>배치(최대 10건)</em>로 처리합니다 — "순번 발급" 자체가 폭주 지점이 될 수 있어서, 진입 API는 요청 ID만 즉시 반환하고 순번은 나중에 폴링으로 확인시킵니다.<a class="cite" href="#r1">[1]</a> 대기열의 문 앞에도 또 하나의 작은 큐가 있는 셈입니다.</p>
+    <p><strong>(b) serving counter 모델.</strong> 입장 게이트를 "스케줄러가 사람을 꺼내는" 대신 <strong>카운터 비교</strong>로 봅니다: 각자 순번(queue position)을 받고, 전역 <span class="term">serving counter</span>가 내 순번 이상이 되는 순간 토큰 발급 자격이 생깁니다.<a class="cite" href="#r2">[2]</a> 입장 정책(시간/인원 기반)은 "카운터를 언제 얼마나 올리는가"로 추상화됩니다 — 정책과 메커니즘의 분리.</p>
+
+    <figure>
+      <div class="fig-box" data-fig="SERVING-COUNTER">
+        <svg viewBox="0 0 780 190" role="img" aria-label="serving counter 모델: 유저 순번과 전역 serving counter를 비교해 입장 자격 판정, inlet strategy가 카운터를 올림">
+          <defs>
+            <marker id="sc1" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+              <path d="M0,0 L9,4.5 L0,9 Z" fill="#B0B8C1"></path>
+            </marker>
+          </defs>
+          <rect x="10" y="30" width="180" height="80" rx="16" fill="#F9FAFB" stroke="#E5E8EB"></rect>
+          <foreignObject x="10" y="30" width="180" height="80"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="t">내 순번 = 512</div><div class="s">진입 시 부여, 불변</div></div></foreignObject>
+          <rect x="300" y="30" width="180" height="80" rx="16" fill="#E8F3FF" stroke="#cfe4ff"></rect>
+          <foreignObject x="300" y="30" width="180" height="80"><div class="fo blue" xmlns="http://www.w3.org/1999/xhtml"><div class="t">serving counter</div><div class="s">전역, 단조 증가</div></div></foreignObject>
+          <rect x="590" y="30" width="180" height="80" rx="16" fill="#E7F9F1" stroke="#bdedd8"></rect>
+          <foreignObject x="590" y="30" width="180" height="80"><div class="fo green" xmlns="http://www.w3.org/1999/xhtml"><div class="t">counter ≥ 512?</div><div class="s">→ 토큰 발급 자격</div></div></foreignObject>
+          <g stroke="#B0B8C1" stroke-width="2" fill="none" marker-end="url(#sc1)">
+            <path d="M190,70 L298,70"></path>
+            <path d="M480,70 L588,70"></path>
+            <path d="M390,155 L390,112"></path>
+          </g>
+          <text x="244" y="60" text-anchor="middle" class="svg-l" fill="#8B95A1">비교</text>
+          <rect x="255" y="155" width="270" height="28" rx="10" fill="#FEEFEF" stroke="#f8d4d4"></rect>
+          <text x="390" y="174" text-anchor="middle" class="svg-s" fill="#C9303C">inlet strategy가 counter를 올림 (시간/인원 정책)</text>
+        </svg>
+        <figcaption><b>정책·메커니즘 분리.</b> 입장 여부는 항상 "counter ≥ 내 순번" 비교. 시간 기반이냐 인원 수 기반이냐는 <b>counter를 올리는 전략</b>의 차이일 뿐이다 (AWS inlet strategy 모델).</figcaption>
+      </div>
+    </figure>
+
+    <div class="note">
+      <span class="tag">우리 과제와의 대응</span>
+      우리 <span class="term">ZPOPMIN</span> 스케줄러는 "꺼내는" 모델이라 counter 비교 모델과 구현은 다르지만 등가입니다 — 스케줄러 주기·배치 크기가 곧 inlet strategy입니다. 차이 하나: ZPOPMIN은 꺼낸 뒤 순번 정보가 사라지므로, <strong>토큰을 못 받은 채 증발하는 유저가 없도록 "꺼냄 → 토큰 발급"이 원자적이어야</strong> 합니다(꺼내고 죽으면 그 유저는 대기열에도 토큰에도 없음). counter 모델은 이 문제가 구조적으로 없습니다 — 설계 결정 카드감.
+    </div>
+  </section>
+
+  <!-- ===================== S3 ===================== -->
+  <section id="s3" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">3</div>
+      <div><p class="sec-eyebrow">ADMISSION CONTROL</p><h2 class="sec">입장 제어 — 시간 기반 vs 인원 수 기반</h2></div>
+    </div>
+
+    <p class="lead">"입장을 어떻게 흘려보내는가"는 조사 전체에서 가장 갈리는 지점이었습니다. 실무 구현들은 <strong>둘 중 하나가 아니라 대부분 하이브리드</strong>였습니다.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>&nbsp;</th><th>시간 기반 (rate)</th><th>인원 수 기반 (slot / concurrency)</th><th>하이브리드</th></tr></thead>
+        <tbody>
+          <tr><td>원리</td><td>주기마다 N명 방출</td><td>"활성 사용자 수 상한" 유지 — 나가야(완료/이탈) 다음이 들어옴</td><td>동시 상한 + 분당 유입 상한 동시 적용</td></tr>
+          <tr><td>실제 구현</td><td>AWS Periodic inlet(1분마다 고정 수)<a class="cite" href="#r2">[2]</a> · Queue-it throughput rate<a class="cite" href="#r14">[14]</a> · NetFUNNEL 초당 N명<a class="cite" href="#r19">[19]</a> · <strong>우리 스케줄러</strong></td><td>AWS MaxSize inlet(완료/이탈 알림만큼 counter 증가)<a class="cite" href="#r2">[2]</a> · SeatGeek leaky bucket(bucket=보호구역 정원, 초과 시 429)<a class="cite" href="#r8">[8]</a><a class="cite" href="#r21">[21]</a></td><td>Cloudflare: Total Active Users + New Users Per Minute, 먼저 걸리는 한도<a class="cite" href="#r10">[10]</a> · SeatGeek: 정원 상한+rate 방출<a class="cite" href="#r8">[8]</a></td></tr>
+          <tr><td>하류 보호</td><td>간접 — "방출률 ≈ 처리율" 가정이 맞을 때만</td><td>직접 — 동시 부하 자체에 상한</td><td>직접 + 유입 평활</td></tr>
+          <tr><td>필요한 신호</td><td>처리율 실측(사전)</td><td><strong>세션 종료 신호</strong> — 완료 이벤트/heartbeat/session TTL</td><td>둘 다</td></tr>
+          <tr><td>실패 모드</td><td>처리 지연 시에도 계속 방출 → 하류 적체</td><td>이탈을 못 감지하면 슬롯 누수 → 대기열 기아(starvation)</td><td>구현 복잡도</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>실무의 답: rate로 흘리되, 부하 신호로 멈춘다</h3>
+    <p>순수 시간 기반의 약점은 "하류가 아픈데도 계속 방출"입니다. AWS Periodic inlet은 그래서 <strong>CloudWatch 알람이 OK일 때만 카운터를 올리는 옵션</strong>을 붙였습니다 — 사이트 사용률 지표가 나쁘면 입장 자동 중지.<a class="cite" href="#r2">[2]</a> Cloudflare는 아예 두 상한을 동시에 겁니다: 분당 유입(rate)과 동시 활성 수(slot) 중 <strong>먼저 걸리는 쪽이 이깁니다</strong>.<a class="cite" href="#r10">[10]</a></p>
+    <p>인원 수 기반의 약점은 반대로 <strong>"나감"을 알아야 한다는 것</strong>입니다. Cloudflare는 session duration(1~30분, 기본 5분) 쿠키 만료로 슬롯을 회수하고<a class="cite" href="#r10">[10]</a>, AWS MaxSize는 사이트 측이 완료(exited)/이탈(abandoned) request ID 목록을 SNS로 보내주는 만큼만 다음 인원을 들입니다.<a class="cite" href="#r2">[2]</a> 이 신호 체계가 없으면 인원 수 기반은 성립하지 않습니다.</p>
+
+    <div class="note key">
+      <span class="tag">R8 판단</span>
+      과제 Must는 시간 기반 스케줄러로 충족됩니다. 다만 <strong>"토큰 미사용 만료분만큼 다음 유저에게 추가 발급"이라는 과제 요구가 사실 인원 수 기반의 슬롯 회수 개념</strong>입니다 — 즉 과제 자체가 이미 하이브리드를 반쯤 요구하고 있습니다. 글감: "시간 기반으로 시작해 만료 회수를 붙이니 하이브리드가 됐다".
+    </div>
+  </section>
+
+  <!-- ===================== S4 ===================== -->
+  <section id="s4" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">4</div>
+      <div><p class="sec-eyebrow">ENTRY TOKEN DESIGN</p><h2 class="sec">입장 토큰 설계 — 포맷 · TTL · 슬롯 회수</h2></div>
+    </div>
+
+    <p class="lead">토큰은 "줄을 거쳐 허락받았다"는 증표입니다. 실무 설계는 <strong>포맷 / 수명 / 재사용 방지 / 회수</strong> 4개 결정으로 분해됩니다.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>결정</th><th>선택지 A</th><th>선택지 B</th><th>실무 사례</th></tr></thead>
+        <tbody>
+          <tr><td>포맷</td><td><strong>opaque 키</strong> (서버 저장·조회) — 즉시 무효화 가능, 상태 조회 필요</td><td><strong>서명 토큰</strong> (JWT/서명 쿠키) — 검증에 저장소 불필요, 즉시 회수 어려움</td><td>AWS: JWT(aud=이벤트, sub=요청ID, queue_position, exp)<a class="cite" href="#r2">[2]</a> · Cloudflare: 암호화 쿠키(acceptedAt, lastCheckInTime)<a class="cite" href="#r5">[5]</a> · Queue-it: 서명 토큰+302 리다이렉트<a class="cite" href="#r14">[14]</a> · <strong>우리: Redis opaque 키</strong></td></tr>
+          <tr><td>TTL 방식</td><td><strong>absolute</strong> — 발급 후 고정 시간 (우리 과제)</td><td><strong>sliding</strong> — 활동마다 갱신</td><td>Cloudflare 기본은 sliding(요청마다 쿠키 갱신), absolute는 Enterprise 옵션<a class="cite" href="#r10">[10]</a> — 결제 플로우처럼 "머무는 시간"이 필요하면 sliding이 자연스러움</td></tr>
+          <tr><td>재발급 방지</td><td colspan="2"><strong>멱등 발급</strong> — 같은 요청 ID로 재호출하면 항상 같은 토큰 반환(새 만료시간의 토큰을 뽑아내는 어뷰징 차단)</td><td>AWS generate_token은 명시적으로 idempotent<a class="cite" href="#r2">[2]</a></td></tr>
+          <tr><td>발급량 상한</td><td colspan="2"><strong>capacity-bound</strong> — 토큰 수 = 재고 수 (토큰이 곧 구매 슬롯)</td><td>SeatGeek: 판매 전 토큰 수를 티켓 수와 동일하게 생성<a class="cite" href="#r8">[8]</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>슬롯 회수 3종 — "받고 안 쓰는 자리"를 되찾는 법</h3>
+    <ul class="checklist">
+      <li><span class="box"></span><b>만료 자동 회수</b> — AWS <span class="term">queue_pos_expiry</span>: 순번 자체에 TTL을 두고, 만료돼 토큰을 못 받은 순번만큼 serving counter를 자동 증가 → 이탈자 때문에 대기열이 멈추지 않음<a class="cite" href="#r2">[2]</a>. 우리 과제의 "만료분만큼 추가 발급"과 동일 개념</li>
+      <li><span class="box"></span><b>능동 회수(revocation)</b> — Cloudflare: 오리진이 응답 헤더 <span class="term">Cf-Waiting-Room-Command</span>로 세션 취소를 명령해 활성 슬롯을 조기 회수 → 처리량 개선<a class="cite" href="#r7">[7]</a>. 우리의 "주문 완료 시 DEL"이 이 축의 최소형</li>
+          <li><span class="box"></span><b>라이프사이클 연동</b> — SeatGeek: 토큰은 구매 완료 또는 이탈 시 만료 — 토큰 수명을 비즈니스 이벤트에 묶음<a class="cite" href="#r8">[8]</a></li>
+    </ul>
+
+    <div class="note">
+      <span class="tag">two-token 패턴</span>
+      SeatGeek은 토큰을 둘로 나눕니다: 도착 시 <strong>visitor token</strong>(도착 timestamp 보유 = 대기 자격)을 주고, 순번이 되면 <strong>access token</strong>(입장 자격)으로 교환합니다.<a class="cite" href="#r21">[21]</a> 우리 설계에선 Sorted Set 멤버십이 visitor token 역할, entry-token이 access token 역할 — 같은 구조를 저장소 두 개로 푼 셈입니다.
+    </div>
+  </section>
+
+  <!-- ===================== S5 ===================== -->
+  <section id="s5" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">5</div>
+      <div><p class="sec-eyebrow">POSITION FEEDBACK</p><h2 class="sec">순번 피드백 — Polling이 기본인 이유</h2></div>
+    </div>
+
+    <p class="lead">조사 결과가 명확합니다: <strong>AWS·Cloudflare·NetFUNNEL 모두 polling이 기본</strong>이고, push(WebSocket)는 SeatGeek 하나였습니다. 대기열 피드백은 단방향·저빈도라 polling의 약점이 거의 드러나지 않기 때문입니다.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>&nbsp;</th><th>Polling</th><th>SSE</th><th>WebSocket</th></tr></thead>
+        <tbody>
+          <tr><td>지연</td><td>주기만큼(1~3s) 늦음. long-polling은 이벤트당 최대 3회 왕복 ≈ 150~450ms<a class="cite" href="#r22">[22]</a></td><td>변경 시점 push</td><td>단일 왕복, 최저</td></tr>
+          <tr><td>인프라</td><td>표준 HTTP 그대로. 단 타임아웃은 중간 장비 한도보다 짧게(예: ALB 60s → 30s)<a class="cite" href="#r22">[22]</a></td><td>LB 연결 유지 설정 필요</td><td>업그레이드 헤더·LB 설정·재연결 로직 필요<a class="cite" href="#r22">[22]</a></td></tr>
+          <tr><td>연결 비용</td><td>요청당. 헤더 ~150-200B/회</td><td>대기 인원 × 1 커넥션</td><td>대기 인원 × 1 커넥션 (프레임 ~2-6B)<a class="cite" href="#r22">[22]</a></td></tr>
+          <tr><td>실패 모드</td><td>실패가 가시적, 자동 복구</td><td>중간</td><td>무음 실패 — 세션 헬스체크 별도 필요<a class="cite" href="#r22">[22]</a></td></tr>
+          <tr><td>실무 채택</td><td>AWS(serving_num 폴링)<a class="cite" href="#r2">[2]</a> · Cloudflare(JSON 응답 + refreshIntervalSeconds)<a class="cite" href="#r6">[6]</a> · NetFUNNEL<a class="cite" href="#r19">[19]</a></td><td>—(조사 범위 내 채택 사례 없음)</td><td>SeatGeek(DynamoDB Streams→CDN push)<a class="cite" href="#r21">[21]</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Polling을 제대로 하는 법 — 서버가 주기를 정하고, 흔든다</h3>
+    <p>Cloudflare의 디테일이 배울 점입니다. JSON 응답에 <span class="term">refreshIntervalSeconds</span>를 담아 <strong>다음 폴링 시점을 서버가 지정</strong>하고, 유저마다 <strong>의사난수 오프셋을 더해 체크인 시점을 분산</strong>합니다 — 대기 인원 전체가 같은 초에 폴링하는 self-inflicted thundering herd를 서버가 예방하는 것입니다. 슬롯 방출도 고정 주기가 아니라 무작위 시점에 해서, 체크인 타이밍을 노린 편법을 막습니다.<a class="cite" href="#r6">[6]</a></p>
+
+    <h3>예상 대기시간 — 단일값이 아니라 범위로</h3>
+    <p>기본 산식은 <span class="term">내 순번 / 초당 처리율</span>이지만, Cloudflare는 random queueing에서 확률 기반 산식 <span class="term">n = log(1-p) / log(1-P(입장/분))</span>으로 percentile을 계산해 <strong>"5분~15분" 범위로 표시</strong>합니다.<a class="cite" href="#r6">[6]</a> 추정치를 단정하지 말고 범위·"약"으로 말하라는 요구사항과 같은 결론입니다.</p>
+  </section>
+
+  <!-- ===================== S6 ===================== -->
+  <section id="s6" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">6</div>
+      <div><p class="sec-eyebrow">FAIRNESS</p><h2 class="sec">공정성 — FIFO의 함정과 4가지 대안</h2></div>
+    </div>
+
+    <p class="lead">직관과 달리, 조사에서 가장 강한 반전은 <strong>"FIFO가 공정성의 유일한 답이 아니다"</strong>였습니다 — 대기열 벤더 스스로가 이렇게 말합니다.</p>
+
+    <blockquote>
+      <p>"FIFO 대기열의 판매는 판매 시작 시각이 아니라, 대기열이 열리는 시각에 사실상 시작된다."</p>
+      <cite>Queue-it — Why First-In-First-Out Queuing Isn't (Always) The Answer<a class="cite" href="#r15">[15]</a></cite>
+    </blockquote>
+
+    <p>스케줄된 판매(티켓팅·플래시세일)에서 순수 FIFO는 밀리초 단위 도착 경쟁이 되고, 그 경쟁은 <strong>초고속 회선과 스캘핑 봇이 구조적으로 이깁니다</strong>.<a class="cite" href="#r15">[15]</a> Cloudflare도 같은 이유(+늦게 온 유저가 긴 대기시간을 보고 이탈하는 문제)로 random queueing을 도입했습니다.<a class="cite" href="#r6">[6]</a></p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>방식</th><th>동작</th><th>맞는 상황</th></tr></thead>
+        <tbody>
+          <tr><td>FIFO</td><td>최초 도착 timestamp 순<a class="cite" href="#r11">[11]</a></td><td>평시·상시 트래픽 — 정확한 대기시간 예측 가능</td></tr>
+          <tr><td>Random</td><td>도착 시간 무관, 슬롯 열릴 때 무작위 선발<a class="cite" href="#r11">[11]</a></td><td>단기 하이프 이벤트(출시·한정판) — 형평 분배<a class="cite" href="#r6">[6]</a></td></tr>
+          <tr><td>Pre-queue + 추첨</td><td>판매 전 도착자는 추첨으로 순번 배정, 이후 도착자만 FIFO<a class="cite" href="#r14">[14]</a><a class="cite" href="#r15">[15]</a></td><td>예고된 오픈 시각 — 조기 접속 이점 무력화</td></tr>
+          <tr><td>Passthrough / Reject</td><td>전부 통과(계측만) / 전부 거부<a class="cite" href="#r11">[11]</a></td><td>평시 모니터링 / 긴급 차단</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>우리 구현의 공정성 디테일 — Redis 공식 문서에서 나온 함정 2개</h3>
+    <ul class="checklist">
+      <li class="must"><span class="box"></span><span class="tag">확정</span><b>재진입 = ZADD NX.</b> ZADD는 기존 멤버를 만나면 score를 <b>덮어씁니다</b>(순번 뒤로 밀림). NX가 "있으면 건드리지 않음"으로 최초 진입 시각을 보존 — 공식 문서가 이 플래그를 명시<a class="cite" href="#r13">[13]</a>. (우리 결정 ②의 공식 근거)</li>
+      <li class="must"><span class="box"></span><span class="tag">신규</span><b>동일 score의 순서는 도착순이 아니다.</b> score가 같으면 멤버 문자열 <b>사전순(lexicographical)</b>으로 정렬됩니다<a class="cite" href="#r12">[12]</a>. 같은 밀리초에 진입한 유저끼리는 userId 사전순 — 엄밀한 FIFO가 아님. 대응: score 해상도를 ms로 + 동률 허용(실용) vs score에 시퀀스 결합(엄밀). 우리 규모(과제)에선 전자로 충분하되 <b>한계를 문서화</b>.</li>
+      <li><span class="box"></span><b>중복 진입 방지</b> — Sorted Set 멤버 유일성(구조적) + 세션 추적. SeatGeek은 first-party 쿠키 + 동일 토큰 동시 사용 차단을 권고<a class="cite" href="#r8">[8]</a></li>
+    </ul>
+  </section>
+
+  <!-- ===================== S7 ===================== -->
+  <section id="s7" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">7</div>
+      <div><p class="sec-eyebrow">ABUSE &amp; BOTS</p><h2 class="sec">어뷰징 · 봇 — 대기열이 뚫리는 방식</h2></div>
+    </div>
+
+    <p class="lead">대기열의 맹점: <strong>트래픽의 "양"만 보고 "품질"을 보지 않는다</strong>는 것.<a class="cite" href="#r23">[23]</a> 봇은 대기열을 우회하는 게 아니라 <strong>대기열에 성실하게 줄을 서서</strong> 이깁니다.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>공격 패턴</th><th>메커니즘</th><th>실무 대응</th></tr></thead>
+        <tbody>
+          <tr><td>다중 점유</td><td>봇이 여러 자리를 동시에 점유 → 실사용자 대기시간 증가. 게다가 차례가 와도 입장하지 않아(쿠키 미처리) 큐 진행 자체를 정체시킴<a class="cite" href="#r7">[7]</a></td><td>진입 시 봇 스코어 연동 — 봇은 뒤로/차단<a class="cite" href="#r7">[7]</a></td></tr>
+          <tr><td>도착 경쟁 승리</td><td>FIFO의 밀리초 경쟁을 스캘핑 봇이 이김<a class="cite" href="#r15">[15]</a></td><td>pre-queue 추첨(§6)</td></tr>
+          <tr><td>잠복 후 활동</td><td>진입 시 1회만 신뢰 판정 → 봇이 인간처럼 진입 후 내부에서 활동(dormant-then-activate)<a class="cite" href="#r23">[23]</a></td><td>지속 검증(continuous validation) — 입장 후에도 행동 재평가<a class="cite" href="#r23">[23]</a></td></tr>
+          <tr><td>토큰 재발급 어뷰징</td><td>같은 자격으로 새 만료시간 토큰을 반복 발급</td><td>멱등 발급 — 같은 요청 ID → 항상 같은 토큰<a class="cite" href="#r2">[2]</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Infinite Queue — 차단 대신 가짜 대기열로</h3>
+    <p>Cloudflare의 재밌는 설계: 챌린지(Turnstile — 대기 중에만 제시, 입장 후엔 없음)에 실패한 트래픽을 차단하지 않고 <strong>Infinite Queue</strong>로 보냅니다. 정상 대기 화면과 똑같지만 예상 대기시간이 점근 곡선이라 <strong>절대 0에 도달하지 않는</strong> 가짜 대기열 — 봇이 차단을 인지하는 시간을 늦추고 리소스를 소모시킵니다. 챌린지를 실행한 "유저"의 약 5%가 통과하지 못했다고 관측됩니다.<a class="cite" href="#r7">[7]</a></p>
+
+    <div class="note">
+      <span class="tag">R8 범위 판단</span>
+      봇 대응은 과제 범위 밖입니다(로그인 사용자 대상 + userId 유일성으로 기본 방어). 단 <strong>"userId는 인증 컨텍스트에서"(R7 결정 4)가 사실 이 축의 최소 방어선</strong>이라는 연결은 글감이 됩니다 — 자칭 식별자를 믿는 순간 다중 점유가 무료가 됩니다.
+    </div>
+  </section>
+
+  <!-- ===================== S8 ===================== -->
+  <section id="s8" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">8</div>
+      <div><p class="sec-eyebrow">OPERATIONS</p><h2 class="sec">운영 — Thundering Herd · 장애 · 지표</h2></div>
+    </div>
+
+    <p class="lead">요구사항이 경고한 "토큰 발급 직후의 함정"을 실무는 <strong>발급 전·중·후 세 지점</strong>에서 나눠 막습니다.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>지점</th><th>기법</th><th>출처</th></tr></thead>
+        <tbody>
+          <tr><td>진입(전)</td><td>진입 요청을 큐에 넣어 배치 처리 — 순번 발급 자체를 비동기로</td><td>AWS SQS 배칭<a class="cite" href="#r1">[1]</a></td></tr>
+          <tr><td>발급(중)</td><td>발급 간격 분산(100ms 단위 소량) + 슬롯 무작위 방출 + 토큰 활성화 jitter</td><td>Cloudflare 무작위 방출<a class="cite" href="#r6">[6]</a> · 과제 명세</td></tr>
+          <tr><td>폴링(중)</td><td>서버 지정 폴링 주기 + 유저별 의사난수 오프셋 — 폴링 자체의 herd 방지</td><td>Cloudflare refreshInterval + offset<a class="cite" href="#r6">[6]</a></td></tr>
+          <tr><td>재시도(후)</td><td>jittered backoff — 동일 스케줄 재시도는 클라이언트를 재동기화시켜 herd 재생성</td><td>Redis 공식 블로그<a class="cite" href="#r3">[3]</a></td></tr>
+          <tr><td>키 만료</td><td>TTL에 jitter(예: 1시간 의도 시 55~65분 랜덤) — 대량 키 동시 만료 방지</td><td>Redis 공식 블로그<a class="cite" href="#r3">[3]</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Redis가 오히려 herd를 만드는 경우</h3>
+    <p>주의: Redis는 herd 방어 도구지만, <strong>동기화된 만료·빈 캐시로 동시에 뜨는 오토스케일 인스턴스</strong> 조합에선 load buffering이 아니라 <strong>load amplification</strong>이 됩니다.<a class="cite" href="#r3">[3]</a> 캐시 미스 시엔 request coalescing(분산 락으로 한 요청만 DB 조회, Lua로 in-progress 마킹)이 표준 처방입니다.<a class="cite" href="#r3">[3]</a></p>
+
+    <h3>장애 시 — 입장을 멈추는 신호부터</h3>
+    <p>AWS 패턴의 핵심은 degradation을 별도 기능이 아니라 <strong>inlet에 내장</strong>한 것입니다: 백엔드 사용률 알람이 OK가 아니면 카운터 증가를 건너뜀 = 입장 자동 중지.<a class="cite" href="#r2">[2]</a> 우리의 fail-close 결정(Redis 죽으면 전면 차단)과 방향이 같고, 한 단계 더 — <strong>Redis가 살아 있어도 하류(DB)가 아프면 스케줄러가 쉬는</strong> 게이트를 붙일 수 있습니다(Nice 후보).</p>
+
+    <h3>지표 — 요구사항 6종 + 실무 추가분</h3>
+    <p>요구사항의 Queue Depth·Avg/P99 Wait·Token Conversion/Expiry·Scheduler Health에 더해, 실무는 <strong>이탈(abandonment)을 별도 신호로</strong> 봅니다: AWS는 완료(exited)와 이탈(abandoned)을 구분해 슬롯 회수량을 계산하고<a class="cite" href="#r2">[2]</a>, Cloudflare는 봇 격리 대기열의 새로고침 횟수(infinite queue refreshes)까지 셉니다.<a class="cite" href="#r7">[7]</a></p>
+  </section>
+
+  <!-- ===================== S9 ===================== -->
+  <section id="s9" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">9</div>
+      <div><p class="sec-eyebrow">KOREAN CASES</p><h2 class="sec">한국 실무 사례 — 대기열 vs 수량 통제</h2></div>
+    </div>
+
+    <p class="lead">국내 사례를 조사하며 분명해진 구분: <strong>"대기열(waiting room)"과 "수량 통제(선착순 쿠폰)"는 다른 문제</strong>입니다. 전자는 <em>순서와 입장</em>을, 후자는 <em>정합성(초과 발급 0)</em>을 지킵니다. R7이 후자였고 R8이 전자입니다.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>사례</th><th>문제</th><th>구조</th><th>배울 점</th></tr></thead>
+        <tbody>
+          <tr><td>NetFUNNEL<a class="cite" href="#r19">[19]</a></td><td>티켓팅 대기열 (멜론티켓·인터파크·예스24 등 채택)</td><td>임계치 초과 시 가상 대기실 자동 생성 → 선착순 티켓(입장 토큰) 발급 → <strong>초당 N명</strong> 순차 입장 + 우회 차단 키 체크</td><td>국내 티켓팅 표준이 시간 기반 admission — 우리 스케줄러와 같은 모델</td></tr>
+          <tr><td>여기어때 네고왕<a class="cite" href="#r16">[16]</a></td><td>선착순 쿠폰 (수량 통제)</td><td>Redis SET에 SCARD+SADD를 MULTI/EXEC로 원자 판정 → Kafka(파티션 3)로 발급 비동기화. 피크 동접 28,800+, TPS 3,600+</td><td>INCR→SET→SET+Tx 3단계 진화 — 원자성 없는 판정은 고부하에서 초과 지급. ⚠️ Redis Tx는 rollback 없음 + Standalone 전용</td></tr>
+          <tr><td>올리브영 올영세일<a class="cite" href="#r17">[17]</a></td><td>선착순 쿠폰 미발급 0.014~1.62% 문제</td><td>GET/INCR 분리가 race 유발 → Lua 원자화(성능 -21%) → <strong>듀얼 카운터</strong>(요청 카운터 선증가, 성능 -8%)로 미발급 0 달성</td><td>원자성 확보 방식마다 성능 비용이 다르다 — 정량 트레이드오프의 모범</td></tr>
+          <tr><td>토스<a class="cite" href="#r18">[18]</a></td><td>스파이크가 DB insert QPS 한계 초과</td><td>Kafka 비동기 적재 + Consumer 스로틀링으로 최대 QPS 제어</td><td>outflow rate 제어를 컨슈머 쪽에서 — R7 파이프라인과 같은 축</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note key">
+      <span class="tag">R8의 위치</span>
+      여기어때·올리브영·토스는 전부 "요청을 받아들인 뒤"의 수량·유량 통제입니다. R8 대기열은 그보다 앞 — <strong>요청이 API에 닿는 것 자체를 조절</strong>합니다. 국내 사례 중 이 위치에 있는 것이 NetFUNNEL(상용)이고, 우리는 그걸 Redis Sorted Set으로 자체 구축하는 셈입니다. 이 위치 구분이 블로그 글의 뼈대가 될 수 있습니다: "선착순 쿠폰(R7)과 주문 대기열(R8)은 왜 다른 문제인가".
+    </div>
+  </section>
+
+  <!-- ===================== S10 ===================== -->
+  <section id="s10" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">10</div>
+      <div><p class="sec-eyebrow">TAKEAWAYS FOR R8</p><h2 class="sec">R8 설계 시사점</h2></div>
+    </div>
+
+    <p class="lead">이 조사가 우리 구현 결정에 직접 닿는 지점들입니다. Must 범위는 그대로 두고, 근거가 더 단단해진 것과 새로 생긴 결정 카드를 구분했습니다.</p>
+
+    <ul class="checklist">
+      <li class="done"><span class="box"></span><b>결정 ② (ZADD NX) 공식 근거 확보</b> — ZADD 기본 동작은 score 덮어쓰기, NX가 최초 진입 보존<a class="cite" href="#r13">[13]</a>. Cloudflare FIFO도 "최초 도착 timestamp 보존" 모델<a class="cite" href="#r11">[11]</a></li>
+      <li class="done"><span class="box"></span><b>결정 ④ (fail-close) 강화 근거</b> — AWS는 하류 부하 알람을 inlet에 연동해 입장 자동 중지<a class="cite" href="#r2">[2]</a>. "Redis 장애 = 차단"에 더해 "하류 불건강 = 스케줄러 일시정지" 게이트가 자연 확장(Nice 후보)</li>
+      <li class="must"><span class="box"></span><span class="tag">NEW</span><b>동일 score 사전순 문제</b> — 같은 ms 진입자는 userId 사전순<a class="cite" href="#r12">[12]</a>. 과제 규모에선 수용하되 한계를 checklist·글에 명시</li>
+      <li class="must"><span class="box"></span><span class="tag">NEW</span><b>ZPOPMIN 원자성 카드</b> — "꺼냄→토큰 발급" 사이에 죽으면 유저 증발(대기열에도 토큰에도 없음). Lua로 묶거나, 꺼낸 목록 처리 실패 시 복구 경로를 정의해야 함. serving counter 모델엔 없는 문제라는 대비가 글감</li>
+      <li class="must"><span class="box"></span><span class="tag">NEW</span><b>토큰 멱등 발급</b> — 재요청 시 새 토큰(새 TTL)이 아니라 기존 토큰 반환<a class="cite" href="#r2">[2]</a>. 우리 구현에선 <span class="term">SET NX</span>로 자연 획득 가능 — 발급 로직에 명시</li>
+      <li class="must"><span class="box"></span><span class="tag">NEW</span><b>폴링 주기의 서버 제어</b> — 응답에 다음 폴링 간격 포함(+jitter)<a class="cite" href="#r6">[6]</a>. "순번 구간별 동적 주기"(Nice)의 구현 형태로 채택 가치</li>
+      <li><span class="box"></span><b>시간 기반 + 만료 회수 = 사실상 하이브리드</b> — 과제 요구 자체가 이미 슬롯 회수 개념을 포함(§3). 블로그 주제 "스케줄러 배치 크기 산정"과 묶으면 입체적</li>
+    </ul>
+
+    <div class="note warn">
+      <span class="tag">출처 관련 주의</span>
+      AWS Virtual Waiting Room 솔루션은 <strong>2025-11 GitHub 아카이브·공식 문서 404</strong> 상태입니다(현 권장: CloudFront Functions 방문자 우선순위화). 본문 인용은 살아있는 공식 블로그·GitHub 저장소 기준이며, "폐기된 레퍼런스 아키텍처의 패턴"으로만 인용해야 합니다 — 최신 AWS 권장 사항으로 쓰면 부정확합니다.
+    </div>
+  </section>
+
+  <!-- ===================== S11 ===================== -->
+  <section id="s11" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">11</div>
+      <div><p class="sec-eyebrow">SOURCES</p><h2 class="sec">참고문헌</h2></div>
+    </div>
+
+    <p class="lead">저명도순 정렬(공식 문서 → 공식 엔지니어링 블로그 → 벤더 공식 → 널리 읽히는 기술 매체). 전부 실재 확인된 URL입니다.</p>
+
+    <h3>공식 문서 · 공식 블로그</h3>
+    <a class="ref" id="r1" href="https://aws.amazon.com/blogs/compute/introducing-aws-virtual-waiting-room/" target="_blank" rel="noopener"><span class="no">1</span><span><span class="h">Introducing AWS Virtual Waiting Room — AWS Compute Blog</span><span class="src">aws.amazon.com/blogs/compute/introducing-aws-virtual-waiting-room/</span></span></a>
+    <a class="ref" id="r2" href="https://github.com/aws-solutions/virtual-waiting-room-on-aws" target="_blank" rel="noopener"><span class="no">2</span><span><span class="h">virtual-waiting-room-on-aws — AWS Solutions 공식 GitHub (⚠️ 2025-11 아카이브·deprecated, developer-guide.md 포함)</span><span class="src">github.com/aws-solutions/virtual-waiting-room-on-aws</span></span></a>
+    <a class="ref" id="r3" href="https://redis.io/blog/how-to-tame-the-thundering-herd-problem/" target="_blank" rel="noopener"><span class="no">3</span><span><span class="h">How to tame the thundering herd problem — Redis 공식 블로그</span><span class="src">redis.io/blog/how-to-tame-the-thundering-herd-problem/</span></span></a>
+    <a class="ref" id="r4" href="https://aws.amazon.com/compare/the-difference-between-kafka-and-redis/" target="_blank" rel="noopener"><span class="no">4</span><span><span class="h">The Difference Between Kafka and Redis — AWS 공식 비교 문서</span><span class="src">aws.amazon.com/compare/the-difference-between-kafka-and-redis/</span></span></a>
+    <a class="ref" id="r5" href="https://blog.cloudflare.com/how-waiting-room-queues/" target="_blank" rel="noopener"><span class="no">5</span><span><span class="h">How Waiting Room makes queueing decisions on Cloudflare's highly distributed network — Cloudflare Blog</span><span class="src">blog.cloudflare.com/how-waiting-room-queues/</span></span></a>
+    <a class="ref" id="r6" href="https://blog.cloudflare.com/waiting-room-random-queueing-and-custom-web-mobile-apps/" target="_blank" rel="noopener"><span class="no">6</span><span><span class="h">Waiting Room: Random Queueing and Custom Web/Mobile Apps — Cloudflare Blog</span><span class="src">blog.cloudflare.com/waiting-room-random-queueing-and-custom-web-mobile-apps/</span></span></a>
+    <a class="ref" id="r7" href="https://blog.cloudflare.com/banish-bots-from-your-waiting-room-and-improve-wait-times-for-real-users/" target="_blank" rel="noopener"><span class="no">7</span><span><span class="h">Banish bots from your Waiting Room — Cloudflare Blog (Turnstile · Infinite Queue · 세션 revocation)</span><span class="src">blog.cloudflare.com/banish-bots-from-your-waiting-room-and-improve-wait-times-for-real-users/</span></span></a>
+    <a class="ref" id="r8" href="https://aws.amazon.com/blogs/architecture/build-a-virtual-waiting-room-with-amazon-dynamodb-and-aws-lambda-at-seatgeek/" target="_blank" rel="noopener"><span class="no">8</span><span><span class="h">Build a Virtual Waiting Room with Amazon DynamoDB and AWS Lambda at SeatGeek — AWS Architecture Blog</span><span class="src">aws.amazon.com/blogs/architecture/build-a-virtual-waiting-room-...-at-seatgeek/</span></span></a>
+    <a class="ref" id="r9" href="https://developers.cloudflare.com/waiting-room/reference/queueing-methods/" target="_blank" rel="noopener"><span class="no">9</span><span><span class="h">Queueing method (FIFO · Random · Passthrough · Reject) — Cloudflare Docs</span><span class="src">developers.cloudflare.com/waiting-room/reference/queueing-methods/</span></span></a>
+    <a class="ref" id="r10" href="https://developers.cloudflare.com/waiting-room/reference/configuration-settings/" target="_blank" rel="noopener"><span class="no">10</span><span><span class="h">Configuration settings (Total Active Users · New Users Per Minute · Session Duration) — Cloudflare Docs</span><span class="src">developers.cloudflare.com/waiting-room/reference/configuration-settings/</span></span></a>
+    <a class="ref" id="r11" href="https://developers.cloudflare.com/waiting-room/reference/queueing-methods/" target="_blank" rel="noopener"><span class="no">11</span><span><span class="h">FIFO 최초 도착 timestamp 쿠키 판정 — Cloudflare Docs (queueing-methods)</span><span class="src">developers.cloudflare.com/waiting-room/reference/queueing-methods/</span></span></a>
+    <a class="ref" id="r12" href="https://redis.io/docs/latest/develop/data-types/sorted-sets/" target="_blank" rel="noopener"><span class="no">12</span><span><span class="h">Sorted sets (skip list 구조 · 동일 score 사전순 정렬 · O(log N)) — Redis 공식 문서</span><span class="src">redis.io/docs/latest/develop/data-types/sorted-sets/</span></span></a>
+    <a class="ref" id="r13" href="https://redis.io/docs/latest/commands/zadd/" target="_blank" rel="noopener"><span class="no">13</span><span><span class="h">ZADD (NX·XX·GT·LT 플래그) — Redis 공식 명령 레퍼런스 (ZRANK: redis.io/docs/latest/commands/zrank/)</span><span class="src">redis.io/docs/latest/commands/zadd/</span></span></a>
+
+    <h3>벤더 공식 · 기업 테크블로그</h3>
+    <a class="ref" id="r14" href="https://queue-it.com/developers/how-queue-it-works/" target="_blank" rel="noopener"><span class="no">14</span><span><span class="h">How Queue-it Works — Queue-it 공식 개발자 문서 (인터스티셜 · 302+서명토큰 · throughput rate)</span><span class="src">queue-it.com/developers/how-queue-it-works/</span></span></a>
+    <a class="ref" id="r15" href="https://queue-it.com/blog/first-in-first-out-randomization/" target="_blank" rel="noopener"><span class="no">15</span><span><span class="h">Why First-In-First-Out Queuing Isn't (Always) The Answer — Queue-it Blog</span><span class="src">queue-it.com/blog/first-in-first-out-randomization/</span></span></a>
+    <a class="ref" id="r16" href="https://techblog.gccompany.co.kr/redis-kafka%EB%A5%BC-%ED%99%9C%EC%9A%A9%ED%95%9C-%EC%84%A0%EC%B0%A9%EC%88%9C-%EC%BF%A0%ED%8F%B0-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%EA%B0%9C%EB%B0%9C%EA%B8%B0-feat-%EB%84%A4%EA%B3%A0%EC%99%95-ec6682e39731" target="_blank" rel="noopener"><span class="no">16</span><span><span class="h">Redis&amp;Kafka를 활용한 선착순 쿠폰 이벤트 개발기 (feat. 네고왕) — 여기어때 기술블로그</span><span class="src">techblog.gccompany.co.kr/redis-kafka를-활용한-선착순-쿠폰-이벤트-개발기-...</span></span></a>
+    <a class="ref" id="r17" href="https://oliveyoung.tech/2025-12-15/fcfs-coupon/" target="_blank" rel="noopener"><span class="no">17</span><span><span class="h">올영세일 선착순 쿠폰, 미발급 0%를 향한 여정 — 올리브영 테크블로그</span><span class="src">oliveyoung.tech/2025-12-15/fcfs-coupon/</span></span></a>
+    <a class="ref" id="r18" href="https://toss.tech/article/monitoring-traffic" target="_blank" rel="noopener"><span class="no">18</span><span><span class="h">가장 많은 트래픽을 받는 토스 서비스의 서버 관리 전략 — 토스 기술블로그</span><span class="src">toss.tech/article/monitoring-traffic</span></span></a>
+    <a class="ref" id="r19" href="https://www.stclab.com/product/netfunnel" target="_blank" rel="noopener"><span class="no">19</span><span><span class="h">넷퍼넬(NetFUNNEL) — STCLab 공식 제품 문서 (국내 티켓팅 다수 채택 가상 대기실)</span><span class="src">stclab.com/product/netfunnel</span></span></a>
+    <a class="ref" id="r20" href="https://www.stclab.com/blog/global-virtual-waiting-room-guide" target="_blank" rel="noopener"><span class="no">20</span><span><span class="h">가상 대기실 솔루션 선택 가이드: NetFUNNEL vs 글로벌 VWR — STCLab 블로그 (벤더 자사 비교 — 중립성 감안)</span><span class="src">stclab.com/blog/global-virtual-waiting-room-guide</span></span></a>
+
+    <h3>널리 읽히는 기술 매체 (2차 출처)</h3>
+    <a class="ref" id="r21" href="https://newsletter.systemdesign.one/p/virtual-waiting-room" target="_blank" rel="noopener"><span class="no">21</span><span><span class="h">Virtual Waiting Room Architecture at SeatGeek — systemdesign.one (leaky bucket · two-token · WebSocket push)</span><span class="src">newsletter.systemdesign.one/p/virtual-waiting-room</span></span></a>
+    <a class="ref" id="r22" href="https://getstream.io/blog/long-polling-vs-websockets/" target="_blank" rel="noopener"><span class="no">22</span><span><span class="h">Long Polling vs WebSockets — Stream 엔지니어링 블로그 (지연·오버헤드·인프라 정량 비교)</span><span class="src">getstream.io/blog/long-polling-vs-websockets/</span></span></a>
+    <a class="ref" id="r23" href="https://datadome.co/bot-management-protection/why-virtual-waiting-rooms-fail/" target="_blank" rel="noopener"><span class="no">23</span><span><span class="h">Why Virtual Waiting Rooms Fail — DataDome (봇 벤더 관점 — self-serving 감안)</span><span class="src">datadome.co/bot-management-protection/why-virtual-waiting-rooms-fail/</span></span></a>
+
+    <div class="note">
+      <span class="tag">출처 등급 표기</span>
+      [1]~[13] 공식 문서·공식 엔지니어링 블로그 / [14]~[20] 벤더 공식·기업 테크블로그(한국 사례 포함) / [21]~[23] 널리 읽히는 2차 매체 — 사용자 승인으로 범위 확장, 수치·주장은 1차 출처와 교차 확인된 것 위주로 인용. 『대규모 시스템 설계 기초』(Alex Xu) 계열 자료는 실재 URL을 확인한 무료 공개 원문이 없어 <strong>직접 인용하지 않았습니다</strong>(책 자체는 오프라인 참고).
+    </div>
+  </section>
+
+  </main>
+
+  <footer>
+    <span class="gl">⁂</span>
+    대기열 시스템 딥다이브 — 아키텍처 · 입장 제어 · 토큰 · 공정성 · 운영<br>
+    멀티소스 교차 조사 (2026-07-07) · 요구사항은 00-requirements · 실행은 checklist.md
+  </footer>
+
+</div>
+
+<script>
+  const bar=document.getElementById('bar');
+  const onScroll=()=>{const h=document.documentElement;const sc=h.scrollTop/(h.scrollHeight-h.clientHeight);bar.style.width=(sc*100)+'%';};
+  document.addEventListener('scroll',onScroll,{passive:true});onScroll();
+  const obs=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');obs.unobserve(e.target);}});},{threshold:.08,rootMargin:'0px 0px -40px 0px'});
+  document.querySelectorAll('.fade').forEach(s=>obs.observe(s));
+</script>
+
+</body>
+</html>

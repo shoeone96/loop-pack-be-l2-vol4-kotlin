@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Round 8 아키텍처 비교 — 대기열 구현 3안</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --blue:#3182F6; --blue-deep:#1B64DA; --blue-bg:#E8F3FF; --blue-bg2:#F4F9FF;
+    --green:#15C47E; --green-deep:#0A8F5B; --green-bg:#E7F9F1;
+    --red:#F04452; --red-deep:#C9303C; --red-bg:#FEEFEF;
+    --g900:#191F28; --g800:#333D4B; --g700:#4E5968; --g600:#6B7684;
+    --g500:#8B95A1; --g400:#B0B8C1; --g300:#D1D6DB; --g200:#E5E8EB;
+    --g100:#F2F4F6; --g50:#F9FAFB; --white:#fff;
+    --sans:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --shadow:0 1px 3px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.05);
+    --shadow-sm:0 1px 3px rgba(0,0,0,.05);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--g100);color:var(--g700);
+    font-family:var(--sans);font-weight:400;font-size:17px;line-height:1.72;
+    -webkit-font-smoothing:antialiased;letter-spacing:-.01em}
+  ::selection{background:var(--blue-bg);color:var(--blue-deep)}
+  #bar{position:fixed;top:0;left:0;height:3px;width:0;z-index:50;background:var(--blue);
+    border-radius:0 3px 3px 0;transition:width .08s linear}
+  .sheet{max-width:860px;margin:40px auto;background:var(--white);
+    border-radius:28px;box-shadow:var(--shadow);overflow:hidden}
+  header.cover{padding:64px 56px 52px;border-bottom:1px solid var(--g100)}
+  .badge{display:inline-flex;align-items:center;gap:7px;background:var(--blue-bg);
+    color:var(--blue-deep);font-size:13px;font-weight:700;padding:8px 14px;border-radius:100px;
+    margin-bottom:26px}
+  .badge .d{width:6px;height:6px;border-radius:50%;background:var(--blue)}
+  h1.title{font-size:clamp(34px,5.6vw,52px);font-weight:800;line-height:1.18;
+    letter-spacing:-.035em;color:var(--g900);margin:0 0 22px}
+  h1.title .hl{color:var(--blue)}
+  .lede{font-size:19px;line-height:1.6;color:var(--g600);font-weight:500;max-width:640px;margin:0 0 36px}
+  .lede b{color:var(--g800);font-weight:700}
+  .chips{display:flex;flex-wrap:wrap;gap:10px}
+  .chip{background:var(--g50);border:1px solid var(--g200);border-radius:14px;padding:12px 16px;font-size:13px}
+  .chip .k{font-weight:700;color:var(--g500);font-size:11px;letter-spacing:.02em;display:block;margin-bottom:3px}
+  .chip .v{color:var(--g700);font-weight:600}
+  nav.toc{padding:40px 56px;background:var(--g50);border-bottom:1px solid var(--g100)}
+  nav.toc h2{font-size:13px;font-weight:700;color:var(--g500);margin:0 0 18px;letter-spacing:.02em}
+  nav.toc ol{margin:0;padding:0;list-style:none;counter-reset:t;display:grid;
+    grid-template-columns:1fr 1fr;gap:8px 18px}
+  nav.toc li{counter-increment:t}
+  nav.toc a{display:flex;align-items:center;gap:13px;padding:12px 14px;border-radius:14px;
+    color:var(--g800);text-decoration:none;font-size:15px;font-weight:600;
+    background:var(--white);border:1px solid var(--g200);transition:.18s}
+  nav.toc a::before{content:counter(t,decimal-leading-zero);font-family:var(--mono);font-size:12px;
+    font-weight:700;color:var(--blue);background:var(--blue-bg);border-radius:8px;
+    width:28px;height:28px;display:grid;place-items:center;flex:none}
+  nav.toc a:hover{border-color:var(--blue);color:var(--blue-deep);transform:translateY(-2px);box-shadow:var(--shadow-sm)}
+  main{padding:0 56px}
+  section{padding:56px 0 18px;border-top:1px solid var(--g100)}
+  section:first-child{border-top:none}
+  .sec-head{display:flex;align-items:center;gap:16px;margin-bottom:26px}
+  .sec-num{font-family:var(--mono);font-size:17px;font-weight:700;color:var(--white);
+    background:var(--blue);border-radius:14px;width:46px;height:46px;display:grid;place-items:center;flex:none;
+    box-shadow:0 4px 12px rgba(49,130,246,.3)}
+  .sec-eyebrow{font-size:12.5px;font-weight:700;color:var(--blue);letter-spacing:.04em;margin:0 0 3px}
+  h2.sec{font-size:clamp(25px,3.6vw,32px);font-weight:800;letter-spacing:-.03em;
+    line-height:1.25;color:var(--g900);margin:0}
+  h3{font-size:19px;font-weight:700;color:var(--g900);margin:34px 0 12px;
+    display:flex;align-items:center;gap:10px}
+  h3::before{content:"";width:5px;height:18px;border-radius:3px;background:var(--blue);flex:none}
+  p{margin:0 0 18px}
+  .lead{font-size:18.5px;line-height:1.6;color:var(--g800);font-weight:600}
+  strong{font-weight:700;color:var(--g900)}
+  em{font-style:normal;font-weight:600;color:var(--g800)}
+  .term{font-family:var(--mono);font-size:.82em;background:var(--g100);color:var(--blue-deep);
+    padding:3px 7px;border-radius:7px;font-weight:500;white-space:nowrap}
+  a.cite{font-family:var(--mono);font-size:10.5px;color:var(--blue);text-decoration:none;
+    vertical-align:super;line-height:0;font-weight:700;padding:0 1px}
+  .note{border-radius:18px;padding:22px 24px;margin:26px 0;font-size:15.5px;line-height:1.7;
+    background:var(--g50);border:1px solid var(--g200);color:var(--g700)}
+  .note .tag{font-size:12px;font-weight:700;display:block;margin-bottom:8px;color:var(--g500)}
+  .note strong{color:var(--g900)}
+  .note.key{background:var(--blue-bg);border-color:#cfe4ff}
+  .note.key .tag{color:var(--blue-deep)} .note.key strong{color:var(--blue-deep)}
+  .note.warn{background:var(--red-bg);border-color:#f8d4d4}
+  .note.warn .tag{color:var(--red-deep)} .note.warn strong{color:var(--red-deep)}
+  figure{margin:36px 0}
+  .fig-box{position:relative;background:var(--g50);border:1px solid var(--g200);border-radius:22px;
+    padding:32px 26px 22px}
+  .fig-box::after{content:attr(data-fig);position:absolute;top:16px;right:20px;font-family:var(--mono);
+    font-size:10.5px;font-weight:700;color:var(--g400);letter-spacing:.1em}
+  figcaption{font-size:13.5px;color:var(--g500);margin-top:16px;text-align:center;
+    line-height:1.6;font-weight:500}
+  figcaption b{color:var(--g700);font-weight:700}
+  svg{display:block;width:100%;height:auto}
+  .svg-l{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.02em}
+  svg foreignObject>.fo{height:100%;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;padding:5px 12px;box-sizing:border-box;
+    overflow:hidden;line-height:1.25;word-break:keep-all}
+  svg foreignObject>.fo .t{font-family:var(--sans);font-weight:700;font-size:14px;color:var(--g900)}
+  svg foreignObject>.fo .s{font-family:var(--mono);font-weight:500;font-size:11px;color:var(--g600);margin-top:2px}
+  svg foreignObject>.fo.blue .t{color:var(--blue-deep)} svg foreignObject>.fo.blue .s{color:var(--blue)}
+  svg foreignObject>.fo.green .t{color:var(--green-deep)} svg foreignObject>.fo.green .s{color:var(--green-deep)}
+  svg foreignObject>.fo.red .t{color:var(--red-deep)} svg foreignObject>.fo.red .s{color:var(--red-deep)}
+  svg foreignObject>.fo.grey .t{color:var(--g800)} svg foreignObject>.fo.grey .s{color:var(--g600)}
+  .sheet:has(.fig-wide){overflow:visible}
+  figure.fig-wide{width:min(1180px,94vw);position:relative;left:50%;transform:translateX(-50%)}
+  @media(max-width:760px){figure.fig-wide{width:100%;left:auto;transform:none}}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:26px 0}
+  .col{border-radius:20px;padding:22px 24px;border:1px solid var(--g200);transition:.2s}
+  .col:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+  .col.x{background:var(--g50)}
+  .col.o{background:var(--blue-bg);border-color:#cfe4ff}
+  .col h4{margin:0 0 10px;font-size:15.5px;font-weight:800;display:flex;align-items:center;gap:9px;color:var(--g900)}
+  .col.o h4{color:var(--blue-deep)}
+  .col h4 .mk{font-family:var(--mono);font-size:11px;font-weight:700;padding:4px 9px;border-radius:8px;
+    background:var(--g200);color:var(--g600);flex:none}
+  .col.o h4 .mk{background:var(--blue);color:#fff}
+  .col p{font-size:14.5px;line-height:1.65;margin:0;color:var(--g700);font-weight:500}
+  .tbl-wrap{margin:26px 0;border:1px solid var(--g200);border-radius:20px;overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:14.5px}
+  thead{background:var(--g50)}
+  th,td{text-align:left;padding:14px 18px;vertical-align:top}
+  th{font-size:12px;font-weight:700;color:var(--g500);letter-spacing:.01em}
+  td{border-top:1px solid var(--g100);font-weight:500;color:var(--g700)}
+  tbody tr:hover{background:var(--blue-bg2)}
+  td:first-child{font-weight:700;color:var(--g900);white-space:nowrap}
+  th:last-child{color:var(--blue)}
+  td:last-child{color:var(--blue-deep);font-weight:600}
+  .docnav{display:flex;flex-wrap:wrap;gap:8px;padding:20px 56px;background:var(--white);
+    border-bottom:1px solid var(--g100)}
+  .docnav a{font-family:var(--mono);font-size:12.5px;font-weight:700;text-decoration:none;
+    padding:9px 14px;border-radius:100px;background:var(--g50);border:1px solid var(--g200);
+    color:var(--g600);transition:.18s}
+  .docnav a:hover{border-color:var(--blue);color:var(--blue-deep);transform:translateY(-1px)}
+  .docnav a.cur{background:var(--blue-bg);border-color:#cfe4ff;color:var(--blue-deep)}
+  .docnav a .n{color:var(--g400);margin-right:6px}
+  .docnav a.cur .n{color:var(--blue)}
+  .xlink{display:flex;align-items:center;gap:15px;text-decoration:none;margin:14px 0;
+    padding:18px 22px;border-radius:18px;background:var(--blue-bg2);border:1px solid var(--blue-bg);transition:.18s}
+  .xlink:hover{border-color:var(--blue);transform:translateX(3px);box-shadow:var(--shadow-sm)}
+  .xlink .ic{flex:none;width:40px;height:40px;border-radius:12px;background:var(--blue);color:#fff;
+    display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:18px}
+  .xlink .t{font-size:11px;font-weight:700;color:var(--blue);letter-spacing:.04em;display:block;margin-bottom:3px}
+  .xlink .h{font-size:15.5px;font-weight:700;color:var(--g900);line-height:1.4;display:block}
+  .xlink .h small{display:block;font-size:13px;font-weight:500;color:var(--g600);margin-top:3px}
+  a.ref{display:flex;gap:14px;align-items:baseline;text-decoration:none;padding:14px 18px;
+    border-radius:14px;background:var(--g50);border:1px solid var(--g200);margin-bottom:8px;transition:.18s}
+  a.ref:hover{border-color:var(--blue);transform:translateX(3px);box-shadow:var(--shadow-sm)}
+  a.ref .no{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--blue);flex:none}
+  a.ref .h{font-size:14px;font-weight:600;color:var(--g800);line-height:1.5}
+  a.ref .src{display:block;font-family:var(--mono);font-size:11px;color:var(--g500);margin-top:2px;word-break:break-all}
+  footer{padding:48px 56px 56px;color:var(--g500);font-family:var(--mono);font-size:11.5px;
+    text-align:center;line-height:1.9;border-top:1px solid var(--g100);font-weight:500}
+  footer .gl{display:block;font-size:26px;margin-bottom:14px;color:var(--g300)}
+  @media(max-width:720px){
+    body{font-size:16px}
+    .sheet{margin:0;border-radius:0}
+    header.cover,nav.toc,main,footer,.docnav{padding-left:24px;padding-right:24px}
+    nav.toc ol,.cols{grid-template-columns:1fr}
+    header.cover{padding-top:48px}
+  }
+  @media(prefers-reduced-motion:no-preference){
+    .fade{opacity:0;transform:translateY(18px);transition:opacity .6s cubic-bezier(.16,1,.3,1),transform .6s cubic-bezier(.16,1,.3,1)}
+    .fade.in{opacity:1;transform:none}
+    .cov>*{opacity:0;transform:translateY(16px);animation:rise .7s cubic-bezier(.16,1,.3,1) forwards}
+    .cov>*:nth-child(1){animation-delay:.04s} .cov>*:nth-child(2){animation-delay:.12s}
+    .cov>*:nth-child(3){animation-delay:.22s} .cov>*:nth-child(4){animation-delay:.34s}
+    @keyframes rise{to{opacity:1;transform:none}}
+  }
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<div class="sheet">
+
+  <header class="cover">
+    <div class="cov">
+      <span class="badge"><span class="d"></span>ROUND 8 · 아키텍처 비교</span>
+      <h1 class="title">무엇으로 줄을 세울 것인가<br><span class="hl">대기열 구현 아키텍처 3안</span></h1>
+      <p class="lede">같은 요구사항(진입 → 순번 → 순차 입장 → 토큰)을 만족하는 구현 아키텍처는 하나가 아닙니다. <b>① Sorted Set 드레인</b>(우리 과제안), <b>② Serving Counter</b>(AWS 방식), <b>③ 메시지 큐</b> 세 후보를 같은 축으로 그려서 비교합니다. 핵심 질문은 하나 — <b>"줄"을 자료구조로 둘 것인가, 숫자 두 개로 둘 것인가, 로그로 둘 것인가.</b></p>
+      <div class="chips">
+        <div class="chip"><span class="k">후보</span><span class="v">3안</span></div>
+        <div class="chip"><span class="k">채택</span><span class="v">① Sorted Set 드레인</span></div>
+        <div class="chip"><span class="k">진짜 경쟁자</span><span class="v">② Serving Counter</span></div>
+        <div class="chip"><span class="k">용도</span><span class="v">블로그 "왜 이 방식인가"의 척추</span></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="docnav">
+    <a href="00-requirements.html"><span class="n">00</span>요구사항</a>
+    <a href="01-waiting-queue-deep-dive.html"><span class="n">01</span>딥다이브</a>
+    <a href="02-user-journey.html"><span class="n">02</span>유저 저니</a>
+    <a class="cur" href="03-architecture-options.html"><span class="n">03</span>아키텍처 3안</a>
+    <a href="checklist.md"><span class="n">—</span>구현 체크리스트</a>
+    <a href="experiments/WRITING-LOG.md"><span class="n">—</span>Writing Log</a>
+  </div>
+
+  <nav class="toc">
+    <h2>목차</h2>
+    <ol>
+      <li><a href="#s1">① Sorted Set 드레인 — 실제 줄에서 꺼낸다</a></li>
+      <li><a href="#s2">② Serving Counter — 번호표와 전광판</a></li>
+      <li><a href="#s3">③ 메시지 큐(Kafka) — 로그에 맡긴다</a></li>
+      <li><a href="#s4">한 표로 비교 — 9개 축</a></li>
+      <li><a href="#s5">판단 — 무엇을 만들고, 무엇을 이식하나</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+  <!-- ===================== S1 ===================== -->
+  <section id="s1" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">1</div>
+      <div><p class="sec-eyebrow">OPTION 1 · PULL — 채택안</p><h2 class="sec">① Sorted Set 드레인 — 실제 줄에서 꺼낸다</h2></div>
+    </div>
+
+    <p class="lead">대기열이 <strong>물리적인 줄</strong>입니다. 유저를 Sorted Set에 넣고(<span class="term">ZADD NX</span>), 순번은 자료구조가 알고 있고(<span class="term">ZRANK</span>), 입장은 스케줄러가 줄 맨 앞에서 <strong>실제로 꺼내면서</strong>(<span class="term">ZPOPMIN N</span>) 일어납니다.</p>
+
+    <figure class="fig-wide">
+      <div class="fig-box" data-fig="OPTION 1">
+        <svg viewBox="0 0 1140 268" role="img" aria-label="Sorted Set 드레인 구조: 사용자가 ZADD NX로 진입, ZRANK 폴링으로 순번 확인, 스케줄러가 ZPOPMIN으로 N명 꺼내 토큰 발급, 주문 API가 토큰 검증 후 삭제. ZPOPMIN과 토큰 발급 사이 원자성 구멍 표시">
+          <defs>
+            <marker id="m1a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+              <path d="M0,0 L9,4.5 L0,9 Z" fill="#B0B8C1"></path>
+            </marker>
+            <marker id="m1b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+              <path d="M0,0 L9,4.5 L0,9 Z" fill="#3182F6"></path>
+            </marker>
+          </defs>
+          <rect x="8" y="62" width="188" height="94" rx="16" fill="#E8F3FF" stroke="#cfe4ff"></rect>
+          <foreignObject x="8" y="62" width="188" height="94"><div class="fo blue" xmlns="http://www.w3.org/1999/xhtml"><div class="t">사용자</div><div class="s">POST /queue/enter</div></div></foreignObject>
+
+          <rect x="240" y="62" width="188" height="94" rx="16" fill="#F9FAFB" stroke="#E5E8EB"></rect>
+          <foreignObject x="240" y="62" width="188" height="94"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="t">대기열 Sorted Set</div><div class="s">ZADD NX score=진입시각</div></div></foreignObject>
+
+          <rect x="472" y="62" width="188" height="94" rx="16" fill="#E8F3FF" stroke="#cfe4ff"></rect>
+          <foreignObject x="472" y="62" width="188" height="94"><div class="fo blue" xmlns="http://www.w3.org/1999/xhtml"><div class="t">스케줄러</div><div class="s">ZPOPMIN N · 100ms 주기</div></div></foreignObject>
+
+          <rect x="704" y="62" width="188" height="94" rx="16" fill="#F9FAFB" stroke="#E5E8EB"></rect>
+          <foreignObject x="704" y="62" width="188" height="94"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="t">입장 토큰</div><div class="s">SET entry-token EX 300</div></div></foreignObject>
+
+          <rect x="936" y="62" width="188" height="94" rx="16" fill="#E7F9F1" stroke="#bfe9d6"></rect>
+          <foreignObject x="936" y="62" width="188" height="94"><div class="fo green" xmlns="http://www.w3.org/1999/xhtml"><div class="t">주문 API</div><div class="s">검증 → 성공 시 DEL</div></div></foreignObject>
+
+          <line x1="196" y1="109" x2="232" y2="109" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m1a)"></line>
+          <line x1="428" y1="109" x2="464" y2="109" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m1a)"></line>
+          <line x1="660" y1="109" x2="696" y2="109" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m1a)"></line>
+          <line x1="892" y1="109" x2="928" y2="109" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m1a)"></line>
+
+          <path d="M 102 156 C 102 206, 334 206, 334 160" fill="none" stroke="#3182F6" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#m1b)"></path>
+          <text x="218" y="222" text-anchor="middle" class="svg-l" fill="#1B64DA">GET /queue/position · ZRANK 폴링</text>
+
+          <rect x="472" y="14" width="420" height="34" rx="10" fill="#FEEFEF" stroke="#f8d4d4"></rect>
+          <foreignObject x="472" y="14" width="420" height="34"><div class="fo red" xmlns="http://www.w3.org/1999/xhtml"><div class="s">⚠ 꺼냄→발급 사이 장애 = 유저 증발 → Lua 원자화 (결정 ⑩)</div></div></foreignObject>
+
+          <text x="570" y="256" text-anchor="middle" class="svg-l" fill="#8B95A1">대기 인원만큼 메모리 O(N) · 순번 조회 O(log N)</text>
+        </svg>
+      </div>
+      <figcaption><b>줄이 곧 자료구조.</b> 진입·순번·중복 방지가 Sorted Set 하나에 내장되는 대신, "꺼내는 동작"이 존재해서 원자성을 스스로 챙겨야 합니다.</figcaption>
+    </figure>
+
+    <div class="cols">
+      <div class="col o">
+        <h4><span class="mk">강점</span> 요구 기능이 자료구조에 내장</h4>
+        <p>순번 조회(<span class="term">ZRANK</span>)·중복 진입 방지(member 유일성)·전체 인원(<span class="term">ZCARD</span>)이 전부 명령 하나입니다. 과제 Must 4개 중 3개가 공짜. 요구사항이 명시한 방식이기도 합니다.</p>
+      </div>
+      <div class="col x">
+        <h4><span class="mk">약점</span> 꺼내는 동작의 대가</h4>
+        <p><span class="term">ZPOPMIN</span>으로 꺼낸 직후 장애가 나면 유저가 대기열에도 토큰에도 없습니다(증발). 대기 인원만큼 메모리 O(N), 순번 조회 O(log N)도 ②보다 비쌉니다.</p>
+      </div>
+    </div>
+
+    <div class="note">
+      <span class="tag">채택 사례</span>
+      지마켓 대기열 시스템(Redcarpet)이 같은 계열입니다 — Sorted Set(score=타임스탬프) + <span class="term">ZRANK</span> 순번 조회 + Job이 유입량만큼 단계 이동.<a class="cite" href="#r5">[5]</a> 우리 R7 선착순 쿠폰의 "Redis 게이트 + 비동기 처리 + 결과 폴링"과도 동형이라 코드 선례가 리포지토리 안에 있습니다.
+    </div>
+
+    <h3>심화 — 컴포넌트 레벨 상세 구조</h3>
+    <p>위 흐름도를 실제 애플리케이션에 얹으면 아래 모양이 됩니다. 핵심은 <strong>세 개의 사이클(대기·입장·주문)이 서로를 직접 호출하지 않고, Redis 키 두 개로만 만난다</strong>는 것입니다.</p>
+
+    <figure class="fig-wide">
+      <div class="fig-box" data-fig="OPTION 1 · DETAIL">
+        <svg viewBox="0 0 1140 690" role="img" aria-label="Sorted Set 드레인 상세 구조: 사용자·commerce-api·Redis·하류 스윔레인. 대기 사이클은 컨트롤러와 서비스가 ZADD NX와 ZRANK로 Redis-only 처리, 입장 사이클은 스케줄러가 100ms마다 Lua로 ZPOPMIN과 토큰 SET을 원자 실행, 주문 사이클은 토큰 검증 후 place 실행과 MySQL, R7 파이프라인으로 연결">
+          <defs>
+            <marker id="m1g" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+              <path d="M0,0 L9,4.5 L0,9 Z" fill="#B0B8C1"></path>
+            </marker>
+            <marker id="m1u" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+              <path d="M0,0 L9,4.5 L0,9 Z" fill="#3182F6"></path>
+            </marker>
+            <marker id="m1v" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+              <path d="M0,0 L9,4.5 L0,9 Z" fill="#15C47E"></path>
+            </marker>
+          </defs>
+
+          <!-- lanes -->
+          <rect x="8" y="56" width="210" height="520" rx="16" fill="#fff" stroke="#E5E8EB"></rect>
+          <rect x="242" y="56" width="520" height="520" rx="16" fill="#fff" stroke="#E5E8EB"></rect>
+          <rect x="786" y="56" width="346" height="520" rx="16" fill="#fff" stroke="#E5E8EB"></rect>
+          <rect x="242" y="592" width="890" height="80" rx="16" fill="#fff" stroke="#E5E8EB"></rect>
+          <text x="113" y="84" text-anchor="middle" class="svg-l" fill="#8B95A1">사용자</text>
+          <text x="502" y="84" text-anchor="middle" class="svg-l" fill="#8B95A1">commerce-api (Spring)</text>
+          <text x="959" y="84" text-anchor="middle" class="svg-l" fill="#8B95A1">Redis</text>
+          <text x="262" y="636" text-anchor="start" class="svg-l" fill="#8B95A1">주문 이후 · R7</text>
+
+          <!-- Redis-only zone -->
+          <rect x="256" y="104" width="868" height="140" rx="14" fill="none" stroke="#3182F6" stroke-width="1.5" stroke-dasharray="6 5"></rect>
+          <text x="1112" y="99" text-anchor="end" class="svg-l" fill="#1B64DA">대기(/queue/*) 경로 = Redis-only · DB 접근 0</text>
+
+          <!-- boxes -->
+          <rect x="28" y="120" width="170" height="96" rx="14" fill="#E8F3FF" stroke="#cfe4ff"></rect>
+          <foreignObject x="28" y="120" width="170" height="96"><div class="fo blue" xmlns="http://www.w3.org/1999/xhtml"><div class="t">대기실 화면</div><div class="s">순번·예상시간 폴링</div></div></foreignObject>
+
+          <rect x="28" y="430" width="170" height="96" rx="14" fill="#E8F3FF" stroke="#cfe4ff"></rect>
+          <foreignObject x="28" y="430" width="170" height="96"><div class="fo blue" xmlns="http://www.w3.org/1999/xhtml"><div class="t">주문서 화면</div><div class="s">토큰 보유 · 5분 내 접수</div></div></foreignObject>
+
+          <rect x="268" y="120" width="210" height="96" rx="14" fill="#F2F4F6" stroke="#E5E8EB"></rect>
+          <foreignObject x="268" y="120" width="210" height="96"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="t">대기열 컨트롤러</div><div class="s">POST /enter · GET /position</div></div></foreignObject>
+
+          <rect x="524" y="120" width="210" height="96" rx="14" fill="#F2F4F6" stroke="#E5E8EB"></rect>
+          <foreignObject x="524" y="120" width="210" height="96"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="t">대기열 서비스</div><div class="s">순번·예상시간·다음 폴링 주기</div></div></foreignObject>
+
+          <rect x="268" y="280" width="210" height="96" rx="14" fill="#E8F3FF" stroke="#cfe4ff"></rect>
+          <foreignObject x="268" y="280" width="210" height="96"><div class="fo blue" xmlns="http://www.w3.org/1999/xhtml"><div class="t">입장 스케줄러</div><div class="s">@Scheduled 100ms · on/off</div></div></foreignObject>
+
+          <rect x="524" y="280" width="210" height="96" rx="14" fill="#E8F3FF" stroke="#3182F6" stroke-width="2"></rect>
+          <foreignObject x="524" y="280" width="210" height="96"><div class="fo blue" xmlns="http://www.w3.org/1999/xhtml"><div class="t">Lua 원자 실행 (결정 ⑩)</div><div class="s">ZPOPMIN N → SET EX 300</div></div></foreignObject>
+
+          <rect x="268" y="430" width="210" height="96" rx="14" fill="#F2F4F6" stroke="#E5E8EB"></rect>
+          <foreignObject x="268" y="430" width="210" height="96"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="t">주문 컨트롤러 진입부</div><div class="s">토큰 검증 · 없으면 409</div></div></foreignObject>
+
+          <rect x="524" y="430" width="210" height="96" rx="14" fill="#F2F4F6" stroke="#E5E8EB"></rect>
+          <foreignObject x="524" y="430" width="210" height="96"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="t">OrderFacade.place()</div><div class="s">@Transactional · 성공 후 DEL</div></div></foreignObject>
+
+          <rect x="806" y="120" width="306" height="110" rx="14" fill="#F2F4F6" stroke="#E5E8EB"></rect>
+          <foreignObject x="806" y="120" width="306" height="110"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="t">queue:orders — Sorted Set</div><div class="s">member=userId · score=진입 시각 ms</div></div></foreignObject>
+
+          <rect x="806" y="300" width="306" height="110" rx="14" fill="#F2F4F6" stroke="#E5E8EB"></rect>
+          <foreignObject x="806" y="300" width="306" height="110"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="t">entry-token:{userId} — String</div><div class="s">불투명 토큰 · EX 300 · SET NX 멱등</div></div></foreignObject>
+
+          <rect x="806" y="440" width="306" height="86" rx="14" fill="#FEEFEF" stroke="#f8d4d4"></rect>
+          <foreignObject x="806" y="440" width="306" height="86"><div class="fo red" xmlns="http://www.w3.org/1999/xhtml"><div class="t">장애 계약 = fail-close</div><div class="s">Redis 다운 → 진입·조회·검증 503 (결정 ③)</div></div></foreignObject>
+
+          <rect x="448" y="600" width="180" height="60" rx="14" fill="#E7F9F1" stroke="#bfe9d6"></rect>
+          <foreignObject x="448" y="600" width="180" height="60"><div class="fo green" xmlns="http://www.w3.org/1999/xhtml"><div class="t">MySQL</div><div class="s">orders INSERT</div></div></foreignObject>
+
+          <rect x="668" y="600" width="220" height="60" rx="14" fill="#E7F9F1" stroke="#bfe9d6"></rect>
+          <foreignObject x="668" y="600" width="220" height="60"><div class="fo green" xmlns="http://www.w3.org/1999/xhtml"><div class="t">Outbox → Kafka</div><div class="s">R7 파이프라인 재사용</div></div></foreignObject>
+
+          <!-- arrows -->
+          <line x1="198" y1="168" x2="260" y2="168" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m1g)"></line>
+          <line x1="478" y1="168" x2="516" y2="168" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m1g)"></line>
+          <line x1="734" y1="168" x2="798" y2="168" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m1g)"></line>
+          <line x1="478" y1="328" x2="516" y2="328" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m1g)"></line>
+          <path d="M 734,306 C 764,296 786,266 800,236" fill="none" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m1g)"></path>
+          <path d="M 734,344 C 758,346 778,350 798,352" fill="none" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m1g)"></path>
+          <path d="M 860,300 C 812,248 726,222 650,218" fill="none" stroke="#3182F6" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#m1u)"></path>
+          <line x1="198" y1="478" x2="260" y2="478" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m1g)"></line>
+          <path d="M 373,430 L 373,404 L 798,404" fill="none" stroke="#15C47E" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#m1v)"></path>
+          <line x1="478" y1="478" x2="516" y2="478" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m1g)"></line>
+          <line x1="596" y1="526" x2="549" y2="594" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m1g)"></line>
+          <line x1="662" y1="526" x2="742" y2="594" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m1g)"></line>
+
+          <!-- step badges -->
+          <g><circle cx="228" cy="168" r="11" fill="#3182F6"></circle><text x="228" y="172" text-anchor="middle" class="svg-l" fill="#fff">1</text></g>
+          <g><circle cx="497" cy="168" r="11" fill="#3182F6"></circle><text x="497" y="172" text-anchor="middle" class="svg-l" fill="#fff">2</text></g>
+          <g><circle cx="766" cy="168" r="11" fill="#3182F6"></circle><text x="766" y="172" text-anchor="middle" class="svg-l" fill="#fff">3</text></g>
+          <g><circle cx="497" cy="328" r="11" fill="#3182F6"></circle><text x="497" y="332" text-anchor="middle" class="svg-l" fill="#fff">4</text></g>
+          <g><circle cx="774" cy="274" r="11" fill="#3182F6"></circle><text x="774" y="278" text-anchor="middle" class="svg-l" fill="#fff">5</text></g>
+          <g><circle cx="766" cy="330" r="11" fill="#3182F6"></circle><text x="766" y="334" text-anchor="middle" class="svg-l" fill="#fff">6</text></g>
+          <g><circle cx="752" cy="246" r="11" fill="#1B64DA"></circle><text x="752" y="250" text-anchor="middle" class="svg-l" fill="#fff">7</text></g>
+          <g><circle cx="228" cy="478" r="11" fill="#3182F6"></circle><text x="228" y="482" text-anchor="middle" class="svg-l" fill="#fff">8</text></g>
+          <g><circle cx="600" cy="404" r="11" fill="#0A8F5B"></circle><text x="600" y="408" text-anchor="middle" class="svg-l" fill="#fff">9</text></g>
+          <g><circle cx="497" cy="478" r="11" fill="#3182F6"></circle><text x="497" y="482" text-anchor="middle" class="svg-l" fill="#fff">10</text></g>
+          <g><circle cx="577" cy="556" r="11" fill="#3182F6"></circle><text x="577" y="560" text-anchor="middle" class="svg-l" fill="#fff">11</text></g>
+          <g><circle cx="698" cy="556" r="11" fill="#3182F6"></circle><text x="698" y="560" text-anchor="middle" class="svg-l" fill="#fff">12</text></g>
+        </svg>
+      </div>
+      <figcaption><b>세 사이클이 Redis 키 두 개에서만 만난다.</b> 대기(1~3, 7)·입장(4~6)·주문(8~12)은 서로를 직접 호출하지 않는 완전 비동기 — 점선 파랑 = 폴링 응답에 토큰 동봉, 점선 초록 = 토큰 검증·소모.</figcaption>
+    </figure>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>사이클</th><th>주도자</th><th>흐름</th><th>특징</th></tr></thead>
+        <tbody>
+          <tr><td>대기 (1~3, 7)</td><td>유저</td><td>enter → ZADD NX · position 폴링 → ZRANK/ZCARD → 내 차례면 응답에 토큰 동봉</td><td>Redis-only — DB 무접촉, 장애 격리</td></tr>
+          <tr><td>입장 (4~6)</td><td>스케줄러</td><td>100ms tick → Lua[ZPOPMIN N + SET EX 300] 원자 실행</td><td>유저 존재와 무관하게 기계적 배수</td></tr>
+          <tr><td>주문 (8~12)</td><td>토큰 소유자</td><td>POST /orders → 토큰 검증 → place() → INSERT → R7 이벤트, 성공 시 DEL</td><td>기존 order 코드 침습 2곳뿐</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Redis 키는 딱 두 개</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>키</th><th>타입</th><th>내용</th><th>명령</th><th>수명</th></tr></thead>
+        <tbody>
+          <tr><td><span class="term">queue:orders</span></td><td>Sorted Set</td><td>member=userId · score=최초 진입 시각(ms)</td><td>ZADD NX · ZRANK · ZCARD · ZPOPMIN</td><td>멤버 TTL 불가 → 스케줄러 배수가 유일한 출구</td></tr>
+          <tr><td><span class="term">entry-token:{userId}</span></td><td>String (유저당 독립 키)</td><td>불투명 토큰 값</td><td>SET NX EX 300 · GET · DEL</td><td>5분 TTL 또는 주문 성공 시 DEL(소모)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <figure class="fig-wide">
+      <div class="fig-box" data-fig="DATA VIEW">
+        <svg viewBox="0 0 1140 560" role="img" aria-label="데이터가 들어간 모습: 왼쪽은 queue:orders Sorted Set 키 하나에 대기자 전원이 score 순으로 정렬되어 있고 맨 앞이 ZPOPMIN 대상, 맨 뒤가 ZADD NX 신규 진입. 오른쪽은 entry-token String 키들이 입장자마다 독립적으로 존재하며 각자 TTL로 만료">
+          <defs>
+            <marker id="m1y" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+              <path d="M0,0 L9,4.5 L0,9 Z" fill="#15C47E"></path>
+            </marker>
+          </defs>
+
+          <!-- left panel: sorted set -->
+          <rect x="8" y="40" width="640" height="480" rx="16" fill="#fff" stroke="#E5E8EB"></rect>
+          <foreignObject x="28" y="52" width="600" height="48"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="t">queue:orders — Sorted Set (키 1개)</div><div class="s">대기자 전원이 이 하나의 키 안에 · score 오름차순 정렬 상태로 저장</div></div></foreignObject>
+
+          <text x="48" y="118" class="svg-l" fill="#8B95A1">순번(계산됨)</text>
+          <text x="160" y="118" class="svg-l" fill="#8B95A1">member</text>
+          <text x="280" y="118" class="svg-l" fill="#8B95A1">score = 진입 시각(ms)</text>
+
+          <rect x="28" y="126" width="440" height="40" rx="10" fill="#E7F9F1" stroke="#bfe9d6"></rect>
+          <text x="48" y="150" class="svg-l" fill="#0A8F5B">0</text>
+          <text x="160" y="150" class="svg-l" fill="#0A8F5B">user-0921</text>
+          <text x="280" y="150" class="svg-l" fill="#0A8F5B">1720340101250</text>
+          <foreignObject x="476" y="126" width="168" height="40"><div class="fo green" xmlns="http://www.w3.org/1999/xhtml"><div class="s">← ZPOPMIN: 다음 꺼냄</div></div></foreignObject>
+
+          <rect x="28" y="172" width="440" height="40" rx="10" fill="#fff" stroke="#E5E8EB"></rect>
+          <text x="48" y="196" class="svg-l" fill="#4E5968">1</text>
+          <text x="160" y="196" class="svg-l" fill="#4E5968">user-0944</text>
+          <text x="280" y="196" class="svg-l" fill="#4E5968">1720340101250</text>
+          <foreignObject x="476" y="172" width="168" height="40"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="s">같은 score → 사전순</div></div></foreignObject>
+
+          <rect x="28" y="218" width="440" height="40" rx="10" fill="#F4F9FF" stroke="#cfe4ff"></rect>
+          <text x="48" y="242" class="svg-l" fill="#1B64DA">2</text>
+          <text x="160" y="242" class="svg-l" fill="#1B64DA">user-1024</text>
+          <text x="280" y="242" class="svg-l" fill="#1B64DA">1720340102891</text>
+          <foreignObject x="476" y="218" width="168" height="40"><div class="fo blue" xmlns="http://www.w3.org/1999/xhtml"><div class="s">ZRANK=2 → "3번째"</div></div></foreignObject>
+
+          <rect x="28" y="264" width="440" height="40" rx="10" fill="#fff" stroke="#E5E8EB"></rect>
+          <text x="48" y="288" class="svg-l" fill="#4E5968">3</text>
+          <text x="160" y="288" class="svg-l" fill="#4E5968">user-0777</text>
+          <text x="280" y="288" class="svg-l" fill="#4E5968">1720340103005</text>
+
+          <text x="248" y="322" text-anchor="middle" class="svg-l" fill="#B0B8C1">⋮ (대기 9,996명)</text>
+
+          <rect x="28" y="340" width="440" height="40" rx="10" fill="#E8F3FF" stroke="#cfe4ff"></rect>
+          <text x="48" y="364" class="svg-l" fill="#1B64DA">9999</text>
+          <text x="160" y="364" class="svg-l" fill="#1B64DA">user-0512</text>
+          <text x="280" y="364" class="svg-l" fill="#1B64DA">1720340659112</text>
+          <foreignObject x="476" y="340" width="168" height="40"><div class="fo blue" xmlns="http://www.w3.org/1999/xhtml"><div class="s">← ZADD NX 신규(맨 뒤)</div></div></foreignObject>
+
+          <foreignObject x="28" y="400" width="600" height="100"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="s">순번(rank)은 저장되지 않습니다 — score 정렬에서 매번 계산(ZRANK). 앞이 빠지면 전원 자동 앞당김. NX가 재진입 시 score 덮어쓰기를 차단(결정 ②)</div></div></foreignObject>
+
+          <!-- link arrow -->
+          <path d="M 646,146 C 668,146 674,140 694,136" fill="none" stroke="#15C47E" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#m1y)"></path>
+
+          <!-- right panel: token keys -->
+          <rect x="680" y="40" width="452" height="480" rx="16" fill="#fff" stroke="#E5E8EB"></rect>
+          <foreignObject x="700" y="52" width="412" height="48"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="t">entry-token:{userId} — String × N개</div><div class="s">입장자마다 독립 키 · 각자 자기 TTL을 가짐</div></div></foreignObject>
+
+          <rect x="700" y="120" width="412" height="74" rx="12" fill="#F9FAFB" stroke="#E5E8EB"></rect>
+          <foreignObject x="712" y="124" width="388" height="44"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="t">entry-token:user-3011</div><div class="s">"tk_9f3a41…" · TTL 291s</div></div></foreignObject>
+          <rect x="716" y="176" width="380" height="8" rx="4" fill="#E5E8EB"></rect>
+          <rect x="716" y="176" width="369" height="8" rx="4" fill="#15C47E"></rect>
+
+          <rect x="700" y="208" width="412" height="74" rx="12" fill="#F9FAFB" stroke="#E5E8EB"></rect>
+          <foreignObject x="712" y="212" width="388" height="44"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="t">entry-token:user-2984</div><div class="s">"tk_77b1c9…" · TTL 143s</div></div></foreignObject>
+          <rect x="716" y="264" width="380" height="8" rx="4" fill="#E5E8EB"></rect>
+          <rect x="716" y="264" width="182" height="8" rx="4" fill="#3182F6"></rect>
+
+          <rect x="700" y="296" width="412" height="74" rx="12" fill="#FEEFEF" stroke="#f8d4d4"></rect>
+          <foreignObject x="712" y="300" width="388" height="44"><div class="fo red" xmlns="http://www.w3.org/1999/xhtml"><div class="t">entry-token:user-2871</div><div class="s">"tk_e0c42d…" · TTL 12s → 만료분 추가 발급으로 보정</div></div></foreignObject>
+          <rect x="716" y="352" width="380" height="8" rx="4" fill="#E5E8EB"></rect>
+          <rect x="716" y="352" width="15" height="8" rx="4" fill="#F04452"></rect>
+
+          <rect x="700" y="384" width="412" height="64" rx="12" fill="none" stroke="#D1D6DB" stroke-dasharray="6 5"></rect>
+          <foreignObject x="712" y="388" width="388" height="56"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="t">entry-token:user-2790</div><div class="s">주문 성공 → DEL — 키 없음 = 명단에서 빠짐</div></div></foreignObject>
+
+          <foreignObject x="700" y="458" width="412" height="52"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="s">각 키가 자기 TTL로 개별 만료 — Set 하나에 담으면 멤버별 TTL이 없어 sweeper가 필요해집니다</div></div></foreignObject>
+        </svg>
+      </div>
+      <figcaption><b>데이터가 들어간 모습.</b> 왼쪽 맨 앞 줄(초록)이 Lua 한 번에 오른쪽 카드 하나로 변환됩니다 — "입장 가능자 명단"은 별도 컬렉션이 아니라 오른쪽 키들의 집합 그 자체입니다.</figcaption>
+    </figure>
+
+    <h3>명령·시간 복잡도 — 최악의 단일 명령이 유계인가</h3>
+    <p>Redis는 <strong>싱글 스레드</strong>라 명령 하나가 도는 동안 다른 모든 클라이언트가 기다립니다. 그래서 점검 기준은 평균 속도가 아니라 <strong>"가장 느린 단일 명령이 유계(bounded)인가"</strong>입니다. Sorted Set은 내부적으로 해시 테이블(member→score, O(1))과 스킵 리스트(score 정렬 + span으로 순위 계산, O(log N)) 두 구조를 동시에 유지하며, 아래 복잡도는 전부 여기서 나옵니다.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>호출</th><th>실행 명령</th><th>복잡도</th><th>N=100만 기준 체감</th></tr></thead>
+        <tbody>
+          <tr><td>POST /queue/enter</td><td>ZADD NX (+토큰 보유 선확인 GET)</td><td>O(log N)</td><td>스킵 리스트 ~20스텝</td></tr>
+          <tr><td>GET /queue/position</td><td>ZRANK + ZCARD + GET</td><td>O(log N) + O(1) + O(1)</td><td>폴링 1회 = ~20스텝. 폴링이 Redis에서 싼 근본 이유</td></tr>
+          <tr><td>스케줄러 tick</td><td>Lua[ZPOPMIN M + SET×M]</td><td><strong>O(M log N)</strong></td><td>M=14면 ~280스텝. M에 선형 — 배치를 키우면 블로킹도 선형 증가</td></tr>
+          <tr><td>POST /orders 진입부</td><td>GET entry-token</td><td>O(1)</td><td>전역 키스페이스 해시 조회</td></tr>
+          <tr><td>주문 성공</td><td>DEL entry-token</td><td>O(1)</td><td>String 1개 삭제</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>유저가 유발하는 모든 명령이 O(log N) 이하이고, 유일하게 자라는 스케줄러의 M은 프로퍼티로 쥔 상수입니다. <strong>대기 인원이 얼마가 되든 개별 명령 비용은 사실상 상수</strong> — "대기열 경로는 Redis-only 초경량"이라는 주장의 수치적 근거입니다. 토큰 TTL 만료도 접근 시 lazy 확인(O(1)) + 백그라운드 샘플링이라 우리 코드 비용은 0입니다.</p>
+
+    <div class="note warn">
+      <span class="tag">금지 명령 목록 — 위험은 코드가 아니라 운영 습관에서 들어온다</span>
+      설계에는 O(N) 명령이 없지만, 운영 중 손버릇이 사고를 냅니다. <strong>① <span class="term">KEYS entry-token:*</span> 절대 금지</strong>(전 키스페이스 동기 스캔 — 유효 토큰 수 세고 싶으면 SCAN 또는 발급−소모 카운터), <strong>② <span class="term">ZRANGE queue:orders 0 -1</span> 금지</strong>(대기열 전체 나열 O(N) — 인원수는 ZCARD, 구경은 LIMIT 걸린 ZRANGE 상위 일부만), <strong>③ 거대 ZSET에 <span class="term">DEL</span> 금지</strong>(동기 메모리 해제 O(N) — 초기화는 비동기 <span class="term">UNLINK</span>로).
+    </div>
+
+    <h3>컴포넌트 책임 (예상 구조 — 열린 결정 ⑦·⑧에서 확정)</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>레이어</th><th>컴포넌트</th><th>책임</th><th>선례</th></tr></thead>
+        <tbody>
+          <tr><td>queue.interfaces</td><td>대기열 컨트롤러</td><td>enter/position 매핑 · userId는 인증 컨텍스트에서 (자칭 식별자 금지)</td><td>R7 결정 4</td></tr>
+          <tr><td>queue.application</td><td>대기열 서비스</td><td>진입·순번·예상시간·다음 폴링 주기 계산 · 트랜잭션 없음</td><td>—</td></tr>
+          <tr><td>queue.application</td><td>입장 스케줄러</td><td>@Scheduled(100ms) · @ConditionalOnProperty on/off · 빈 배치 조용히 return</td><td>OutboxRelay</td></tr>
+          <tr><td>queue.infrastructure</td><td>대기열 Redis 어댑터</td><td>masterRedisTemplate · Lua 스크립트 소유</td><td>CouponIssueGatekeeper</td></tr>
+          <tr><td>order (기존)</td><td>주문 컨트롤러 진입부 · OrderFacade</td><td>토큰 검증(진입부) + place() 성공 후 DEL — 침습 이 2곳뿐</td><td>Gatekeeper.tryPass()</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note key">
+      <span class="tag">이 그림의 핵심 한 줄</span>
+      <strong>대기열은 주문 도메인을 모르고, 주문 도메인은 대기열의 존재를 토큰 하나로만 감지합니다.</strong> 유저·스케줄러·주문 세 사이클이 서로를 호출하지 않으니 어느 쪽이 죽어도 나머지는 계속 돌고, 스케줄러의 N × 주기 두 숫자가 하류로 가는 수도꼭지 전부가 됩니다.
+    </div>
+  </section>
+
+  <!-- ===================== S2 ===================== -->
+  <section id="s2" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">2</div>
+      <div><p class="sec-eyebrow">OPTION 2 · COUNTER — 진짜 경쟁자</p><h2 class="sec">② Serving Counter — 번호표와 전광판</h2></div>
+    </div>
+
+    <p class="lead">은행 창구 모델입니다. 줄이라는 자료구조가 없습니다 — 유저는 <strong>불변 번호표</strong>를 받고(<span class="term">INCR</span>), 입장은 유저를 꺼내는 게 아니라 <strong>"몇 번까지 입장"이라는 전광판 숫자를 올리는 것</strong>입니다. AWS Virtual Waiting Room의 공식 아키텍처입니다.<a class="cite" href="#r3">[3]</a></p>
+
+    <figure class="fig-wide">
+      <div class="fig-box" data-fig="OPTION 2">
+        <svg viewBox="0 0 1140 300" role="img" aria-label="Serving Counter 구조: 사용자가 INCR로 불변 번호표를 받고, 스케줄러는 serving counter 전광판 숫자만 올린다. 순번은 내 번호 빼기 serving으로 O(1) 계산, 내 번호가 serving 이하가 되면 토큰 교환">
+          <defs>
+            <marker id="m2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+              <path d="M0,0 L9,4.5 L0,9 Z" fill="#B0B8C1"></path>
+            </marker>
+            <marker id="m2b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+              <path d="M0,0 L9,4.5 L0,9 Z" fill="#3182F6"></path>
+            </marker>
+          </defs>
+          <rect x="8" y="94" width="188" height="94" rx="16" fill="#E8F3FF" stroke="#cfe4ff"></rect>
+          <foreignObject x="8" y="94" width="188" height="94"><div class="fo blue" xmlns="http://www.w3.org/1999/xhtml"><div class="t">사용자</div><div class="s">POST /queue/enter</div></div></foreignObject>
+
+          <rect x="240" y="94" width="188" height="94" rx="16" fill="#F9FAFB" stroke="#E5E8EB"></rect>
+          <foreignObject x="240" y="94" width="188" height="94"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="t">번호표 발급</div><div class="s">INCR → 내 번호 1024 (불변)</div></div></foreignObject>
+
+          <rect x="472" y="94" width="188" height="94" rx="16" fill="#E8F3FF" stroke="#cfe4ff"></rect>
+          <foreignObject x="472" y="94" width="188" height="94"><div class="fo blue" xmlns="http://www.w3.org/1999/xhtml"><div class="t">전광판</div><div class="s">serving_counter = 987</div></div></foreignObject>
+
+          <rect x="497" y="14" width="138" height="52" rx="12" fill="#F9FAFB" stroke="#E5E8EB"></rect>
+          <foreignObject x="497" y="14" width="138" height="52"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="s">스케줄러 +N / 주기</div></div></foreignObject>
+          <line x1="566" y1="66" x2="566" y2="86" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m2a)"></line>
+
+          <rect x="704" y="94" width="188" height="94" rx="16" fill="#F9FAFB" stroke="#E5E8EB"></rect>
+          <foreignObject x="704" y="94" width="188" height="94"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="t">순번 계산</div><div class="s">1024 − 987 = 37 · O(1)</div></div></foreignObject>
+
+          <rect x="936" y="94" width="188" height="94" rx="16" fill="#E7F9F1" stroke="#bfe9d6"></rect>
+          <foreignObject x="936" y="94" width="188" height="94"><div class="fo green" xmlns="http://www.w3.org/1999/xhtml"><div class="t">토큰 교환</div><div class="s">내 번호 ≤ serving · SET NX</div></div></foreignObject>
+
+          <line x1="196" y1="141" x2="232" y2="141" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m2a)"></line>
+          <line x1="428" y1="141" x2="464" y2="141" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m2a)"></line>
+          <line x1="660" y1="141" x2="696" y2="141" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m2a)"></line>
+          <line x1="892" y1="141" x2="928" y2="141" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m2a)"></line>
+
+          <path d="M 102 188 C 102 240, 566 240, 566 192" fill="none" stroke="#3182F6" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#m2b)"></path>
+          <text x="334" y="258" text-anchor="middle" class="svg-l" fill="#1B64DA">폴링 = 전광판 숫자 하나 읽기 (GET · O(1))</text>
+
+          <text x="570" y="288" text-anchor="middle" class="svg-l" fill="#0A8F5B">꺼내는 동작이 없음 → "유저 증발"이 구조적으로 불가능</text>
+        </svg>
+      </div>
+      <figcaption><b>정책과 메커니즘의 분리.</b> 입장 속도 조절 = 숫자를 올리는 속도 조절. 대기열 상태는 카운터 두 개가 전부입니다.</figcaption>
+    </figure>
+
+    <div class="cols">
+      <div class="col o">
+        <h4><span class="mk">강점</span> 원자성 문제가 아예 없음</h4>
+        <p>모든 연산이 O(1) 원자 명령(<span class="term">INCR</span>, <span class="term">GET</span>)입니다. 유저를 꺼내지 않으니 ①의 증발 문제가 <strong>구조적으로 존재하지 않고</strong>, 메모리도 카운터 2개면 끝. 폴링 부하에도 가장 강합니다.</p>
+      </div>
+      <div class="col x">
+        <h4><span class="mk">약점</span> 내장 기능이 없어 다 만들어야 함</h4>
+        <p>중복 진입 방지(userId→번호 매핑), 이탈자 보정(번호표 받고 사라진 유저만큼 serving 추가 증가 — AWS <span class="term">queue_pos_expiry</span><a class="cite" href="#r4">[4]</a>), 전체 대기 인원 계산을 전부 별도로 구현해야 합니다.</p>
+      </div>
+    </div>
+
+    <div class="note">
+      <span class="tag">채택 사례</span>
+      AWS Virtual Waiting Room 솔루션의 공식 아키텍처입니다 — 클라이언트는 자기 번호와 <span class="term">serving_num</span>을 비교하며 폴링하고, inlet 로직이 counter를 올립니다.<a class="cite" href="#r3">[3]</a> 하류 사용률 알람이 정상일 때만 counter를 올리는 자동 게이트까지 붙습니다.
+    </div>
+  </section>
+
+  <!-- ===================== S3 ===================== -->
+  <section id="s3" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">3</div>
+      <div><p class="sec-eyebrow">OPTION 3 · LOG — 탈락안</p><h2 class="sec">③ 메시지 큐(Kafka) — 로그에 맡긴다</h2></div>
+    </div>
+
+    <p class="lead">대기열을 브로커의 <strong>append-only 로그</strong>로 보는 관점입니다. 진입 요청을 토픽에 쌓고, 컨슈머가 <strong>하류가 감당하는 속도만큼만 소비</strong>하면서 토큰을 발급합니다. Back-pressure 관점만 보면 가장 자연스러운 모델입니다.</p>
+
+    <figure class="fig-wide">
+      <div class="fig-box" data-fig="OPTION 3">
+        <svg viewBox="0 0 1140 250" role="img" aria-label="Kafka 기반 구조: 사용자 진입 이벤트를 토픽에 발행, 컨슈머가 처리 속도만큼 소비하며 토큰 발급. 그러나 로그는 랜덤 액세스가 불가해 순번 조회를 위해 별도 상태 저장소가 필요">
+          <defs>
+            <marker id="m3a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+              <path d="M0,0 L9,4.5 L0,9 Z" fill="#B0B8C1"></path>
+            </marker>
+            <marker id="m3b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+              <path d="M0,0 L9,4.5 L0,9 Z" fill="#F04452"></path>
+            </marker>
+          </defs>
+          <rect x="8" y="56" width="220" height="94" rx="16" fill="#E8F3FF" stroke="#cfe4ff"></rect>
+          <foreignObject x="8" y="56" width="220" height="94"><div class="fo blue" xmlns="http://www.w3.org/1999/xhtml"><div class="t">사용자</div><div class="s">진입 이벤트 produce</div></div></foreignObject>
+
+          <rect x="300" y="56" width="250" height="94" rx="16" fill="#F9FAFB" stroke="#E5E8EB"></rect>
+          <foreignObject x="300" y="56" width="250" height="94"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="t">Kafka 토픽</div><div class="s">append-only 로그 · 디스크 영속</div></div></foreignObject>
+
+          <rect x="622" y="56" width="250" height="94" rx="16" fill="#E8F3FF" stroke="#cfe4ff"></rect>
+          <foreignObject x="622" y="56" width="250" height="94"><div class="fo blue" xmlns="http://www.w3.org/1999/xhtml"><div class="t">컨슈머</div><div class="s">하류 처리 속도만큼 소비</div></div></foreignObject>
+
+          <rect x="944" y="56" width="188" height="94" rx="16" fill="#E7F9F1" stroke="#bfe9d6"></rect>
+          <foreignObject x="944" y="56" width="188" height="94"><div class="fo green" xmlns="http://www.w3.org/1999/xhtml"><div class="t">토큰 발급</div><div class="s">SET entry-token EX</div></div></foreignObject>
+
+          <line x1="228" y1="103" x2="292" y2="103" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m3a)"></line>
+          <line x1="550" y1="103" x2="614" y2="103" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m3a)"></line>
+          <line x1="872" y1="103" x2="936" y2="103" stroke="#B0B8C1" stroke-width="2" marker-end="url(#m3a)"></line>
+
+          <path d="M 118 150 C 118 196, 380 196, 412 158" fill="none" stroke="#F04452" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#m3b)"></path>
+          <rect x="300" y="196" width="540" height="38" rx="10" fill="#FEEFEF" stroke="#f8d4d4"></rect>
+          <foreignObject x="300" y="196" width="540" height="38"><div class="fo red" xmlns="http://www.w3.org/1999/xhtml"><div class="s">✗ "내 순번?" — 로그는 랜덤 액세스 불가 → 결국 옆에 Redis 상태 저장소가 또 필요</div></div></foreignObject>
+        </svg>
+      </div>
+      <figcaption><b>Back-pressure는 공짜, 순번 조회는 불가.</b> 실시간 순번 조회가 Must인 이 과제와 정면으로 상충합니다.</figcaption>
+    </figure>
+
+    <div class="cols">
+      <div class="col o">
+        <h4><span class="mk">강점</span> 내구성과 유량 제어</h4>
+        <p>디스크 영속이라 브로커가 재시작해도 줄이 안 사라집니다(Redis 휘발성과 대비<a class="cite" href="#r6">[6]</a>). 소비 속도 = 입장 속도라 back-pressure가 별도 스케줄러 없이 구조로 구현되고, R7 Kafka 인프라를 재사용할 수 있습니다.</p>
+      </div>
+      <div class="col x">
+        <h4><span class="mk">약점</span> 순번 조회가 안 됨 — 탈락 사유</h4>
+        <p>로그 중간을 들여다볼 수 없어 "내 앞에 몇 명?"에 답하려면 결국 Redis 같은 상태 저장소를 옆에 둬야 합니다. 그 순간 ①/②에 Kafka를 <strong>얹은</strong> 복잡도가 되고, 순번 조회 Must와 정면 상충합니다.</p>
+      </div>
+    </div>
+
+    <div class="note warn">
+      <span class="tag">탈락 판정</span>
+      <strong>실시간 순번 조회(Step 3 Must)가 탈락 사유의 전부이자 충분조건입니다.</strong> "대기 결과를 나중에 알려줘도 되는" 워크로드(R7 쿠폰 발급이 정확히 이것)라면 최선이지만, "지금 내 앞에 몇 명인지"를 계속 보여줘야 하는 대기열에는 자료구조가 맞지 않습니다. 같은 Redis+Kafka 조합이라도 여기어때 쿠폰 시스템처럼 <em>Redis가 게이트, Kafka는 후처리</em>로 역할을 나누는 게 정석입니다.<a class="cite" href="#r7">[7]</a>
+    </div>
+  </section>
+
+  <!-- ===================== S4 ===================== -->
+  <section id="s4" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">4</div>
+      <div><p class="sec-eyebrow">COMPARISON</p><h2 class="sec">한 표로 비교 — 9개 축</h2></div>
+    </div>
+
+    <p class="lead">오른쪽 끝이 채택안입니다. 왼쪽에서 오른쪽으로 갈수록 이 과제의 요구에 가깝습니다.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>비교 축</th><th>③ Kafka 로그</th><th>② Serving Counter</th><th>① Sorted Set 드레인 · 채택</th></tr></thead>
+        <tbody>
+          <tr><td>모델</td><td>append-only 로그를 속도 조절하며 소비</td><td>불변 번호표 + 전광판 숫자 올리기</td><td>실제 줄에서 앞사람부터 꺼내기</td></tr>
+          <tr><td>순번 조회</td><td>✗ 불가 — 별도 저장소 필요</td><td>내 번호 − serving · O(1)</td><td>ZRANK · O(log N)</td></tr>
+          <tr><td>중복 진입 방지</td><td>별도 구현</td><td>별도 구현 (userId→번호 매핑)</td><td>내장 (member 유일성)</td></tr>
+          <tr><td>유저 증발 리스크</td><td>낮음 (오프셋 커밋으로 재처리)</td><td>구조적으로 없음 (꺼냄이 없음)</td><td>있음 — ZPOPMIN→발급 사이 → Lua 원자화</td></tr>
+          <tr><td>입장 속도 제어</td><td>컨슈머 소비 속도</td><td>counter 증가 속도 (정책·메커니즘 분리)</td><td>ZPOPMIN N × 스케줄러 주기</td></tr>
+          <tr><td>이탈/만료 유저</td><td>처리 애매 (로그를 되돌릴 수 없음)</td><td>만료 번호만큼 serving 추가 증가 보정</td><td>이미 큐에서 나감 → 재진입 (맨 뒤)</td></tr>
+          <tr><td>메모리/저장</td><td>브로커 디스크 (영속 최강)</td><td>카운터 2개 + 매핑</td><td>대기 인원 O(N) in Redis</td></tr>
+          <tr><td>검증된 채택 사례</td><td>대기열 용도로는 조사 범위 내 없음</td><td>AWS Virtual Waiting Room<a class="cite" href="#r3">[3]</a></td><td>지마켓 Redcarpet<a class="cite" href="#r5">[5]</a> · R7 쿠폰 동형</td></tr>
+          <tr><td>과제 적합성</td><td>✗ 순번 조회 Must 상충</td><td>△ 성립하지만 요구 자료구조가 아님</td><td>✓ 요구사항 명시 + Must 3개 내장</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <span class="tag">읽는 법</span>
+      셋 중 무엇도 "전부 이기는" 안은 없습니다. <strong>②는 원자성·비용에서 이기고, ①은 기능 내장·과제 적합성에서 이깁니다.</strong> ③은 이 요구사항에서만 지는 것이지, 순번 노출이 필요 없는 비동기 처리(R7 쿠폰)에서는 이깁니다 — 아키텍처 선택은 언제나 워크로드 종속입니다.
+    </div>
+  </section>
+
+  <!-- ===================== S5 ===================== -->
+  <section id="s5" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">5</div>
+      <div><p class="sec-eyebrow">DECISION</p><h2 class="sec">판단 — 무엇을 만들고, 무엇을 이식하나</h2></div>
+    </div>
+
+    <p class="lead">구현은 <strong>①로 확정</strong>(과제 명시 + Must 내장 + 사내 선례). 하지만 ②를 이해한 채로 ①을 만드는 것과 모르고 만드는 것은 결과물이 다릅니다 — <strong>①의 모든 약점에는 ②에서 가져올 처방이 있습니다.</strong></p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>①의 약점</th><th>②의 처방</th><th>우리 구현에 이식</th></tr></thead>
+        <tbody>
+          <tr><td>꺼냄→발급 원자성 구멍</td><td>꺼냄 자체가 없음</td><td>ZPOPMIN + SET을 Lua로 원자화 (결정 ⑩)</td></tr>
+          <tr><td>토큰 재요청 어뷰징</td><td>generate_token 멱등<a class="cite" href="#r3">[3]</a></td><td>SET NX — 재요청 시 기존 토큰 반환</td></tr>
+          <tr><td>만료 유저만큼 유량 손실</td><td>queue_pos_expiry 자동 보정<a class="cite" href="#r4">[4]</a></td><td>만료분만큼 다음 배치 추가 발급</td></tr>
+          <tr><td>폴링 스파이크</td><td>counter 읽기 O(1)로 버팀</td><td>서버 지정 폴링 주기(nextPollSeconds) + jitter</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note key">
+      <span class="tag">블로그의 척추</span>
+      글의 구조가 이 문서 그대로입니다 — <strong>"Sorted Set으로 만들었다"가 아니라 "Serving Counter와 견줘보니 이 구멍이 보였고, 그래서 이렇게 막았다"</strong>. ③의 탈락 사유(순번 조회 불가)는 한 단락, ②와의 대비는 본문 전체를 끌고 갑니다.
+    </div>
+
+    <a class="xlink" href="checklist.md">
+      <span class="ic">→</span>
+      <span><span class="t">실행으로</span><span class="h">구현 체크리스트 — Step 1·2·3 + 결정 현황<small>이 문서의 판단이 체크리스트 확정/열린 결정에 매핑되어 있습니다.</small></span></span>
+    </a>
+
+    <h3>참고문헌</h3>
+    <a class="ref" href="https://redis.io/docs/latest/develop/data-types/sorted-sets/" target="_blank" rel="noopener"><span class="no">[1]</span><span class="h">Redis Sorted Sets — Redis Docs<span class="src">redis.io/docs/latest/develop/data-types/sorted-sets/</span></span></a>
+    <a class="ref" href="https://redis.io/docs/latest/commands/zadd/" target="_blank" rel="noopener"><span class="no">[2]</span><span class="h">ZADD (NX · score 갱신 규칙) — Redis Docs<span class="src">redis.io/docs/latest/commands/zadd/</span></span></a>
+    <a class="ref" href="https://aws.amazon.com/blogs/compute/introducing-aws-virtual-waiting-room/" target="_blank" rel="noopener"><span class="no">[3]</span><span class="h">Introducing AWS Virtual Waiting Room (serving counter · idempotent token) — AWS Compute Blog<span class="src">aws.amazon.com/blogs/compute/introducing-aws-virtual-waiting-room/</span></span></a>
+    <a class="ref" href="https://github.com/aws-solutions/virtual-waiting-room-on-aws" target="_blank" rel="noopener"><span class="no">[4]</span><span class="h">virtual-waiting-room-on-aws (queue_pos_expiry · inlet 로직, 2025-11 아카이브) — aws-solutions GitHub<span class="src">github.com/aws-solutions/virtual-waiting-room-on-aws</span></span></a>
+    <a class="ref" href="https://dev.gmarket.com/46" target="_blank" rel="noopener"><span class="no">[5]</span><span class="h">지마켓 대기열 시스템 파헤치기 (Redcarpet · Sorted Set + ZRANK) — Gmarket Tech Blog<span class="src">dev.gmarket.com/46</span></span></a>
+    <a class="ref" href="https://aws.amazon.com/compare/the-difference-between-kafka-and-redis/" target="_blank" rel="noopener"><span class="no">[6]</span><span class="h">Kafka와 Redis의 차이 (영속성 · 랜덤 액세스) — AWS<span class="src">aws.amazon.com/compare/the-difference-between-kafka-and-redis/</span></span></a>
+    <a class="ref" href="https://techblog.gccompany.co.kr/redis-kafka%EB%A5%BC-%ED%99%9C%EC%9A%A9%ED%95%9C-%EC%84%A0%EC%B0%A9%EC%88%9C-%EC%BF%A0%ED%8F%B0-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%EA%B0%9C%EB%B0%9C%EA%B8%B0-feat-%EB%84%A4%EA%B3%A0%EC%99%95-ec6682e39731" target="_blank" rel="noopener"><span class="no">[7]</span><span class="h">Redis, Kafka를 활용한 선착순 쿠폰 이벤트 개발기 — 여기어때 기술블로그<span class="src">techblog.gccompany.co.kr</span></span></a>
+  </section>
+
+  </main>
+
+  <footer>
+    <span class="gl">⁂</span>
+    Round 8 아키텍처 비교 — Sorted Set 드레인 · Serving Counter · Kafka 로그<br>
+    구현은 ① · 척추는 ②와의 대비 · ③은 탈락 사유 한 단락
+  </footer>
+
+</div>
+
+<script>
+  const bar=document.getElementById('bar');
+  const onScroll=()=>{const h=document.documentElement;const sc=h.scrollTop/(h.scrollHeight-h.clientHeight);bar.style.width=(sc*100)+'%';};
+  document.addEventListener('scroll',onScroll,{passive:true});onScroll();
+  const obs=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');obs.unobserve(e.target);}});},{threshold:.08,rootMargin:'0px 0px -40px 0px'});
+  document.querySelectorAll('.fade').forEach(s=>obs.observe(s));
+</script>
+
+</body>
+</html>
