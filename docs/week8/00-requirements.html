@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Round 8 요구사항 정리 — 주문 대기열 · 입장 토큰 · 실시간 순번</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --blue:#3182F6; --blue-deep:#1B64DA; --blue-bg:#E8F3FF; --blue-bg2:#F4F9FF;
+    --green:#15C47E; --green-deep:#0A8F5B; --green-bg:#E7F9F1;
+    --red:#F04452; --red-deep:#C9303C; --red-bg:#FEEFEF;
+    --g900:#191F28; --g800:#333D4B; --g700:#4E5968; --g600:#6B7684;
+    --g500:#8B95A1; --g400:#B0B8C1; --g300:#D1D6DB; --g200:#E5E8EB;
+    --g100:#F2F4F6; --g50:#F9FAFB; --white:#fff;
+    --sans:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --shadow:0 1px 3px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.05);
+    --shadow-sm:0 1px 3px rgba(0,0,0,.05);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--g100);color:var(--g700);
+    font-family:var(--sans);font-weight:400;font-size:17px;line-height:1.72;
+    -webkit-font-smoothing:antialiased;letter-spacing:-.01em}
+  ::selection{background:var(--blue-bg);color:var(--blue-deep)}
+  #bar{position:fixed;top:0;left:0;height:3px;width:0;z-index:50;background:var(--blue);
+    border-radius:0 3px 3px 0;transition:width .08s linear}
+  .sheet{max-width:860px;margin:40px auto;background:var(--white);
+    border-radius:28px;box-shadow:var(--shadow);overflow:hidden}
+  header.cover{padding:64px 56px 52px;border-bottom:1px solid var(--g100)}
+  .badge{display:inline-flex;align-items:center;gap:7px;background:var(--blue-bg);
+    color:var(--blue-deep);font-size:13px;font-weight:700;padding:8px 14px;border-radius:100px;
+    margin-bottom:26px}
+  .badge .d{width:6px;height:6px;border-radius:50%;background:var(--blue)}
+  h1.title{font-size:clamp(34px,5.6vw,52px);font-weight:800;line-height:1.18;
+    letter-spacing:-.035em;color:var(--g900);margin:0 0 22px}
+  h1.title .hl{color:var(--blue)}
+  .lede{font-size:19px;line-height:1.6;color:var(--g600);font-weight:500;max-width:640px;margin:0 0 36px}
+  .lede b{color:var(--g800);font-weight:700}
+  .chips{display:flex;flex-wrap:wrap;gap:10px}
+  .chip{background:var(--g50);border:1px solid var(--g200);border-radius:14px;padding:12px 16px;font-size:13px}
+  .chip .k{font-weight:700;color:var(--g500);font-size:11px;letter-spacing:.02em;display:block;margin-bottom:3px}
+  .chip .v{color:var(--g700);font-weight:600}
+  nav.toc{padding:40px 56px;background:var(--g50);border-bottom:1px solid var(--g100)}
+  nav.toc h2{font-size:13px;font-weight:700;color:var(--g500);margin:0 0 18px;letter-spacing:.02em}
+  nav.toc ol{margin:0;padding:0;list-style:none;counter-reset:t;display:grid;
+    grid-template-columns:1fr 1fr;gap:8px 18px}
+  nav.toc li{counter-increment:t}
+  nav.toc a{display:flex;align-items:center;gap:13px;padding:12px 14px;border-radius:14px;
+    color:var(--g800);text-decoration:none;font-size:15px;font-weight:600;
+    background:var(--white);border:1px solid var(--g200);transition:.18s}
+  nav.toc a::before{content:counter(t,decimal-leading-zero);font-family:var(--mono);font-size:12px;
+    font-weight:700;color:var(--blue);background:var(--blue-bg);border-radius:8px;
+    width:28px;height:28px;display:grid;place-items:center;flex:none}
+  nav.toc a:hover{border-color:var(--blue);color:var(--blue-deep);transform:translateY(-2px);box-shadow:var(--shadow-sm)}
+  main{padding:0 56px}
+  section{padding:56px 0 18px;border-top:1px solid var(--g100)}
+  section:first-child{border-top:none}
+  .sec-head{display:flex;align-items:center;gap:16px;margin-bottom:26px}
+  .sec-num{font-family:var(--mono);font-size:17px;font-weight:700;color:var(--white);
+    background:var(--blue);border-radius:14px;width:46px;height:46px;display:grid;place-items:center;flex:none;
+    box-shadow:0 4px 12px rgba(49,130,246,.3)}
+  .sec-eyebrow{font-size:12.5px;font-weight:700;color:var(--blue);letter-spacing:.04em;margin:0 0 3px}
+  h2.sec{font-size:clamp(25px,3.6vw,32px);font-weight:800;letter-spacing:-.03em;
+    line-height:1.25;color:var(--g900);margin:0}
+  h3{font-size:19px;font-weight:700;color:var(--g900);margin:34px 0 12px;
+    display:flex;align-items:center;gap:10px}
+  h3::before{content:"";width:5px;height:18px;border-radius:3px;background:var(--blue);flex:none}
+  p{margin:0 0 18px}
+  .lead{font-size:18.5px;line-height:1.6;color:var(--g800);font-weight:600}
+  strong{font-weight:700;color:var(--g900)}
+  em{font-style:normal;font-weight:600;color:var(--g800)}
+  .term{font-family:var(--mono);font-size:.82em;background:var(--g100);color:var(--blue-deep);
+    padding:3px 7px;border-radius:7px;font-weight:500;white-space:nowrap}
+  a.cite{font-family:var(--mono);font-size:10.5px;color:var(--blue);text-decoration:none;
+    vertical-align:super;line-height:0;font-weight:700;padding:0 1px}
+  blockquote{margin:32px 0;padding:28px 30px;background:var(--blue-bg2);border-radius:20px;
+    border:1px solid var(--blue-bg)}
+  blockquote p{font-size:20px;font-weight:700;line-height:1.5;color:var(--blue-deep);margin:0 0 12px;letter-spacing:-.02em}
+  blockquote cite{font-family:var(--mono);font-style:normal;font-size:12px;color:var(--g500);
+    display:block;font-weight:500}
+  .note{border-radius:18px;padding:22px 24px;margin:26px 0;font-size:15.5px;line-height:1.7;
+    background:var(--g50);border:1px solid var(--g200);color:var(--g700)}
+  .note .tag{font-size:12px;font-weight:700;display:block;margin-bottom:8px;color:var(--g500)}
+  .note strong{color:var(--g900)}
+  .note.key{background:var(--blue-bg);border-color:#cfe4ff}
+  .note.key .tag{color:var(--blue-deep)} .note.key strong{color:var(--blue-deep)}
+  .note.warn{background:var(--red-bg);border-color:#f8d4d4}
+  .note.warn .tag{color:var(--red-deep)} .note.warn strong{color:var(--red-deep)}
+  .note.q{background:var(--blue-bg2);border-color:var(--blue-bg)}
+  .note.q .tag{color:var(--blue-deep)} .note.q strong{color:var(--blue-deep)}
+  .note.q .ask{font-size:18px;font-weight:700;color:var(--blue-deep);letter-spacing:-.02em;
+    display:block;margin-bottom:8px;line-height:1.45}
+  figure{margin:36px 0}
+  .fig-box{position:relative;background:var(--g50);border:1px solid var(--g200);border-radius:22px;
+    padding:32px 26px 22px}
+  .fig-box::after{content:attr(data-fig);position:absolute;top:16px;right:20px;font-family:var(--mono);
+    font-size:10.5px;font-weight:700;color:var(--g400);letter-spacing:.1em}
+  figcaption{font-size:13.5px;color:var(--g500);margin-top:16px;text-align:center;
+    line-height:1.6;font-weight:500}
+  figcaption b{color:var(--g700);font-weight:700}
+  svg{display:block;width:100%;height:auto}
+  .svg-t{font-family:var(--sans);font-weight:700;font-size:14px}
+  .svg-s{font-family:var(--mono);font-size:11px;font-weight:500}
+  .svg-l{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.02em}
+  svg foreignObject>.fo{height:100%;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;padding:5px 12px;box-sizing:border-box;
+    overflow:hidden;line-height:1.25;word-break:keep-all}
+  svg foreignObject>.fo .t{font-family:var(--sans);font-weight:700;font-size:14px;color:var(--g900)}
+  svg foreignObject>.fo .s{font-family:var(--mono);font-weight:500;font-size:11px;color:var(--g600);margin-top:2px}
+  svg foreignObject>.fo.blue .t{color:var(--blue-deep)} svg foreignObject>.fo.blue .s{color:var(--blue)}
+  svg foreignObject>.fo.green .t{color:var(--green-deep)} svg foreignObject>.fo.green .s{color:var(--green-deep)}
+  svg foreignObject>.fo.red .t{color:var(--red-deep)} svg foreignObject>.fo.red .s{color:var(--red-deep)}
+  svg foreignObject>.fo.grey .t{color:var(--g800)} svg foreignObject>.fo.grey .s{color:var(--g600)}
+  .sheet:has(.fig-wide){overflow:visible}
+  figure.fig-wide{width:min(1180px,94vw);position:relative;left:50%;transform:translateX(-50%)}
+  @media(max-width:760px){figure.fig-wide{width:100%;left:auto;transform:none}}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:26px 0}
+  .col{border-radius:20px;padding:22px 24px;border:1px solid var(--g200);transition:.2s}
+  .col:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+  .col.x{background:var(--g50)}
+  .col.o{background:var(--blue-bg);border-color:#cfe4ff}
+  .col h4{margin:0 0 10px;font-size:15.5px;font-weight:800;display:flex;align-items:center;gap:9px;color:var(--g900)}
+  .col.o h4{color:var(--blue-deep)}
+  .col h4 .mk{font-family:var(--mono);font-size:11px;font-weight:700;padding:4px 9px;border-radius:8px;
+    background:var(--g200);color:var(--g600);flex:none}
+  .col.o h4 .mk{background:var(--blue);color:#fff}
+  .col p{font-size:14.5px;line-height:1.65;margin:0;color:var(--g700);font-weight:500}
+  .tbl-wrap{margin:26px 0;border:1px solid var(--g200);border-radius:20px;overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:14.5px}
+  thead{background:var(--g50)}
+  th,td{text-align:left;padding:14px 18px;vertical-align:top}
+  th{font-size:12px;font-weight:700;color:var(--g500);letter-spacing:.01em}
+  th:nth-child(3){color:var(--blue)}
+  td{border-top:1px solid var(--g100);font-weight:500;color:var(--g700)}
+  tbody tr:hover{background:var(--blue-bg2)}
+  td:first-child{font-weight:700;color:var(--g900);white-space:nowrap}
+  td:last-child{color:var(--blue-deep);font-weight:600}
+  .checklist{list-style:none;margin:24px 0;padding:0}
+  .checklist li{position:relative;display:block;padding:13px 16px 13px 48px;margin-bottom:8px;
+    background:var(--g50);border:1px solid var(--g200);border-radius:14px;font-size:15px;
+    line-height:1.62;color:var(--g700);font-weight:500}
+  .checklist li .box{position:absolute;left:16px;top:14px;width:20px;height:20px;border-radius:6px;
+    border:2px solid var(--g300);background:var(--white)}
+  .checklist li.done{background:var(--blue-bg);border-color:#cfe4ff}
+  .checklist li.done .box{background:var(--blue);border-color:var(--blue)}
+  .checklist li.done .box::after{content:"";position:absolute;left:5px;top:1px;width:6px;height:11px;
+    border:solid #fff;border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
+  .checklist li .tag{float:right;font-family:var(--mono);font-size:10.5px;font-weight:700;
+    color:var(--g500);background:var(--g100);padding:3px 9px;border-radius:7px;margin-left:10px}
+  .checklist li.must .tag{color:var(--blue-deep);background:#d8e9ff}
+  .checklist li b{color:var(--g900);font-weight:700}
+  .checklist li .term{white-space:normal}
+  .docnav{display:flex;flex-wrap:wrap;gap:8px;padding:20px 56px;background:var(--white);
+    border-bottom:1px solid var(--g100)}
+  .docnav a{font-family:var(--mono);font-size:12.5px;font-weight:700;text-decoration:none;
+    padding:9px 14px;border-radius:100px;background:var(--g50);border:1px solid var(--g200);
+    color:var(--g600);transition:.18s}
+  .docnav a:hover{border-color:var(--blue);color:var(--blue-deep);transform:translateY(-1px)}
+  .docnav a.cur{background:var(--blue-bg);border-color:#cfe4ff;color:var(--blue-deep)}
+  .docnav a .n{color:var(--g400);margin-right:6px}
+  .docnav a.cur .n{color:var(--blue)}
+  .xlink{display:flex;align-items:center;gap:15px;text-decoration:none;margin:14px 0;
+    padding:18px 22px;border-radius:18px;background:var(--blue-bg2);border:1px solid var(--blue-bg);transition:.18s}
+  .xlink:hover{border-color:var(--blue);transform:translateX(3px);box-shadow:var(--shadow-sm)}
+  .xlink .ic{flex:none;width:40px;height:40px;border-radius:12px;background:var(--blue);color:#fff;
+    display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:18px}
+  .xlink .t{font-size:11px;font-weight:700;color:var(--blue);letter-spacing:.04em;display:block;margin-bottom:3px}
+  .xlink .h{font-size:15.5px;font-weight:700;color:var(--g900);line-height:1.4;display:block}
+  .xlink .h small{display:block;font-size:13px;font-weight:500;color:var(--g600);margin-top:3px}
+  footer{padding:48px 56px 56px;color:var(--g500);font-family:var(--mono);font-size:11.5px;
+    text-align:center;line-height:1.9;border-top:1px solid var(--g100);font-weight:500}
+  footer .gl{display:block;font-size:26px;margin-bottom:14px;color:var(--g300)}
+  @media(max-width:720px){
+    body{font-size:16px}
+    .sheet{margin:0;border-radius:0}
+    header.cover,nav.toc,main,footer,.docnav{padding-left:24px;padding-right:24px}
+    nav.toc ol,.cols{grid-template-columns:1fr}
+    header.cover{padding-top:48px}
+  }
+  @media(prefers-reduced-motion:no-preference){
+    .fade{opacity:0;transform:translateY(18px);transition:opacity .6s cubic-bezier(.16,1,.3,1),transform .6s cubic-bezier(.16,1,.3,1)}
+    .fade.in{opacity:1;transform:none}
+    .cov>*{opacity:0;transform:translateY(16px);animation:rise .7s cubic-bezier(.16,1,.3,1) forwards}
+    .cov>*:nth-child(1){animation-delay:.04s} .cov>*:nth-child(2){animation-delay:.12s}
+    .cov>*:nth-child(3){animation-delay:.22s} .cov>*:nth-child(4){animation-delay:.34s}
+    @keyframes rise{to{opacity:1;transform:none}}
+  }
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<div class="sheet">
+
+  <header class="cover">
+    <div class="cov">
+      <span class="badge"><span class="d"></span>ROUND 8 · 요구사항 명세</span>
+      <h1 class="title">무엇을 해야 하는가<br><span class="hl">주문 대기열 · 입장 토큰 · 실시간 순번</span></h1>
+      <p class="lede">Round 8의 테마는 트래픽이 폭증하는 순간 <b>시스템이 감당하는 속도만큼만 요청을 흘려보내면서(Back-pressure)</b>, 유저에게는 <b>공정한 순서와 실시간 피드백</b>을 주는 대기열을 <b>Redis Sorted Set</b>으로 구현하는 것입니다. 이 문서는 개념 설명이 아니라 <b>해야 할 일 · 합격 기준 · 판단해야 할 것</b>을 MECE하게 정리한 명세·체크리스트입니다.</p>
+      <div class="chips">
+        <div class="chip"><span class="k">테마</span><span class="v">Back-pressure · 줄 세우기</span></div>
+        <div class="chip"><span class="k">핵심 자료구조</span><span class="v">Redis Sorted Set</span></div>
+        <div class="chip"><span class="k">피드백</span><span class="v">Polling → (SSE)</span></div>
+        <div class="chip"><span class="k">위치</span><span class="v">주문 API 앞단 관문</span></div>
+        <div class="chip"><span class="k">마감</span><span class="v">금 7/10 18:00</span></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="docnav">
+    <a class="cur" href="00-requirements.html"><span class="n">00</span>요구사항</a>
+    <a href="01-waiting-queue-deep-dive.html"><span class="n">01</span>딥다이브</a>
+    <a href="02-user-journey.html"><span class="n">02</span>유저 저니</a>
+    <a href="03-architecture-options.html"><span class="n">03</span>아키텍처 3안</a>
+    <a href="checklist.md"><span class="n">—</span>구현 체크리스트</a>
+    <a href="experiments/WRITING-LOG.md"><span class="n">—</span>Writing Log</a>
+  </div>
+
+  <nav class="toc">
+    <h2>목차</h2>
+    <ol>
+      <li><a href="#s1">한눈에 보기 — Must-Have vs Nice-To-Have</a></li>
+      <li><a href="#s2">Step 1 — Redis Sorted Set 대기열</a></li>
+      <li><a href="#s3">Step 2 — 입장 토큰 & 스케줄러</a></li>
+      <li><a href="#s4">Step 3 — 실시간 순번 조회 (Polling)</a></li>
+      <li><a href="#s5">검증 — 통과해야 할 3가지</a></li>
+      <li><a href="#s6">숨은 리스크 — Thundering Herd · 장애 · 지표</a></li>
+      <li><a href="#s7">Round 7과의 연결점 (재사용 자산)</a></li>
+      <li><a href="#s8">Technical Writing · 제출</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+  <!-- ===================== S1 ===================== -->
+  <section id="s1" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">1</div>
+      <div><p class="sec-eyebrow">SCOPE AT A GLANCE</p><h2 class="sec">한눈에 보기 — Must-Have vs Nice-To-Have</h2></div>
+    </div>
+
+    <p class="lead">Rate Limiting은 초과 요청을 <strong>거부</strong>(429)하고, Queuing은 <strong>보관</strong>합니다. 블랙 프라이데이처럼 <em>유저가 기다릴 의사가 있는</em> 트래픽에서 "나중에 다시 시도"는 재시도 폭풍을 부릅니다. 그래서 이번엔 거부가 아니라 <strong>줄 세우기</strong>를 구현합니다.</p>
+
+    <div class="cols">
+      <div class="col o">
+        <h4><span class="mk">MUST</span> 무조건 구현</h4>
+        <p>Redis Sorted Set 대기열 · 입장 토큰 발급/검증(TTL) · 스케줄러 기반 순차 입장 · Polling 순번 조회. 이 네 축이 Round 8의 합격선입니다.</p>
+      </div>
+      <div class="col x">
+        <h4><span class="mk">NICE</span> 시간 되면</h4>
+        <p>SSE 실시간 Push · Polling 주기 동적 조절 · Thundering Herd 완화(분산/Jitter) · Redis 장애 시 Graceful Degradation. Must가 끝난 뒤에 손댑니다.</p>
+      </div>
+    </div>
+
+    <figure class="fig-wide">
+      <div class="fig-box" data-fig="FLOW">
+        <svg viewBox="0 0 1140 210" role="img" aria-label="주문 대기열 전체 흐름: 대기열 진입 ZADD, 순번 조회 ZRANK polling, 스케줄러 ZPOPMIN, 입장 토큰 SET EX, 주문 API 토큰 검증, 이후 R7 이벤트 파이프라인">
+          <defs>
+            <marker id="qa1" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+              <path d="M0,0 L9,4.5 L0,9 Z" fill="#B0B8C1"></path>
+            </marker>
+          </defs>
+          <!-- boxes -->
+          <g>
+            <rect x="8"   y="56" width="164" height="94" rx="16" fill="#E8F3FF" stroke="#cfe4ff"></rect>
+            <foreignObject x="8"   y="56" width="164" height="94"><div class="fo blue" xmlns="http://www.w3.org/1999/xhtml"><div class="t">사용자</div><div class="s">POST /queue/enter</div></div></foreignObject>
+
+            <rect x="204" y="56" width="164" height="94" rx="16" fill="#F9FAFB" stroke="#E5E8EB"></rect>
+            <foreignObject x="204" y="56" width="164" height="94"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="t">대기열 Sorted Set</div><div class="s">ZADD score=ts</div></div></foreignObject>
+
+            <rect x="400" y="56" width="164" height="94" rx="16" fill="#F9FAFB" stroke="#E5E8EB"></rect>
+            <foreignObject x="400" y="56" width="164" height="94"><div class="fo grey" xmlns="http://www.w3.org/1999/xhtml"><div class="t">순번 조회 · Polling</div><div class="s">GET position · ZRANK</div></div></foreignObject>
+
+            <rect x="596" y="56" width="164" height="94" rx="16" fill="#E8F3FF" stroke="#cfe4ff"></rect>
+            <foreignObject x="596" y="56" width="164" height="94"><div class="fo blue" xmlns="http://www.w3.org/1999/xhtml"><div class="t">스케줄러</div><div class="s">ZPOPMIN N · 100ms</div></div></foreignObject>
+
+            <rect x="792" y="56" width="164" height="94" rx="16" fill="#E7F9F1" stroke="#bdedd8"></rect>
+            <foreignObject x="792" y="56" width="164" height="94"><div class="fo green" xmlns="http://www.w3.org/1999/xhtml"><div class="t">입장 토큰</div><div class="s">SET entry-token EX 5m</div></div></foreignObject>
+
+            <rect x="988" y="56" width="152" height="94" rx="16" fill="#E8F3FF" stroke="#cfe4ff"></rect>
+            <foreignObject x="988" y="56" width="152" height="94"><div class="fo blue" xmlns="http://www.w3.org/1999/xhtml"><div class="t">주문 API</div><div class="s">토큰 검증 → 주문</div></div></foreignObject>
+          </g>
+          <!-- arrows -->
+          <g stroke="#B0B8C1" stroke-width="2" fill="none" marker-end="url(#qa1)">
+            <path d="M172,103 L202,103"></path>
+            <path d="M368,103 L398,103"></path>
+            <path d="M564,103 L594,103"></path>
+            <path d="M760,103 L790,103"></path>
+            <path d="M956,103 L986,103"></path>
+          </g>
+          <!-- labels -->
+          <text x="90"  y="34" text-anchor="middle" class="svg-l" fill="#8B95A1">진입</text>
+          <text x="482" y="34" text-anchor="middle" class="svg-l" fill="#8B95A1">대기 · 실시간 피드백</text>
+          <text x="678" y="34" text-anchor="middle" class="svg-l" fill="#3182F6">throughput 제어</text>
+          <text x="1064" y="34" text-anchor="middle" class="svg-l" fill="#8B95A1">이후 = R7</text>
+        </svg>
+        <figcaption>대기열은 <b>주문 API 앞단의 관문</b>이다. 진입(ZADD) → 순번 조회(ZRANK, polling) → 스케줄러가 앞에서 N명씩 꺼내(ZPOPMIN) 토큰 발급 → 토큰 검증 후 주문. <b>주문 이후 흐름은 R7 이벤트 파이프라인</b>이 그대로 동작한다.</figcaption>
+      </div>
+    </figure>
+
+    <div class="note key">
+      <span class="tag">왜 스케일업/아웃이 답이 아닌가</span>
+      서버를 10배 늘려도 <strong>DB와 PG는 스케일이 제한적</strong>이고, 피크가 극단적으로 짧고 높으면(행사 시작 직후 10초) 오토스케일이 반응하기 전에 터집니다. 결국 <strong>시스템이 처리할 수 있는 속도로 요청을 조절(Back-pressure)</strong>하는 것이 핵심이고, 대기열은 그 대표적 구현입니다.
+    </div>
+  </section>
+
+  <!-- ===================== S2 ===================== -->
+  <section id="s2" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">2</div>
+      <div><p class="sec-eyebrow">STEP 1 · WAITING QUEUE</p><h2 class="sec">Redis Sorted Set 대기열</h2></div>
+    </div>
+
+    <p class="lead">유저 요청을 <strong>진입 순서대로 보관</strong>하고 <strong>중복 진입을 방지</strong>합니다. Sorted Set은 score(진입 시각)로 정렬되고 member(userId)는 집합이라 유일합니다 — 이 둘이 "공정한 순서 + 중복 방지"를 동시에 해결합니다.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>명령</th><th>역할</th><th>키 · 의미</th></tr></thead>
+        <tbody>
+          <tr><td>ZADD</td><td>대기열 진입</td><td>queue:orders {timestamp} {userId}</td></tr>
+          <tr><td>ZRANK</td><td>내 순번 조회 (0-based)</td><td>queue:orders {userId}</td></tr>
+          <tr><td>ZCARD</td><td>전체 대기 인원</td><td>queue:orders</td></tr>
+          <tr><td>ZPOPMIN</td><td>앞에서 N명 꺼내기 (스케줄러)</td><td>queue:orders {N}</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <ul class="checklist">
+      <li class="must"><span class="box"></span><span class="tag">MUST</span><b>진입 API</b> <span class="term">POST /api/v1/queue/enter</span> — <span class="term">ZADD</span>, score=진입 시각. userId는 body 아닌 <b>인증 컨텍스트</b>에서 (R7 결정 4: 자칭 식별자 금지)</li>
+      <li class="must"><span class="box"></span><span class="tag">MUST</span><b>순번 조회 API</b> <span class="term">GET /api/v1/queue/position</span> — <span class="term">ZRANK</span> 결과 +1 을 사람이 읽는 순번으로</li>
+      <li class="must"><span class="box"></span><span class="tag">MUST</span><b>중복 진입 방지</b> — Sorted Set member 유일성으로 자연 방지. 재진입 시 최초 진입 시각 유지 여부는 결정 사항</li>
+      <li class="must"><span class="box"></span><span class="tag">MUST</span><b>전체 대기 인원</b> — <span class="term">ZCARD</span> (운영 지표 Queue Depth 겸용)</li>
+    </ul>
+
+    <div class="note">
+      <span class="tag">과설계 경계</span>
+      단순 <span class="term">ZADD</span>/<span class="term">ZRANK</span>는 단일 원자 명령이라 쿠폰 게이트키퍼처럼 <b>Lua 스크립트가 꼭 필요하지 않을 수 있습니다.</b> 여러 명령을 하나의 원자 단위로 묶어야 할 때(예: 정원 확인 + 진입)만 Lua를 도입하고, 근거를 Writing Log에 남깁니다.
+    </div>
+  </section>
+
+  <!-- ===================== S3 ===================== -->
+  <section id="s3" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">3</div>
+      <div><p class="sec-eyebrow">STEP 2 · ENTRY TOKEN & SCHEDULER</p><h2 class="sec">입장 토큰 & 스케줄러</h2></div>
+    </div>
+
+    <p class="lead">스케줄러가 일정 주기로 대기열 앞에서 <strong>N명씩 꺼내 입장 토큰을 발급</strong>합니다. 토큰은 <strong>TTL</strong>이 있어 시간 내 쓰지 않으면 자동 만료되고, 토큰이 있는 유저만 주문 API에 진입합니다.</p>
+
+    <ul class="checklist">
+      <li class="must"><span class="box"></span><span class="tag">MUST</span><b>배치 드레인 스케줄러</b> — <span class="term">@Scheduled</span> 주기 실행 → <span class="term">ZPOPMIN N</span> → 토큰 발급. <span class="term">@ConditionalOnProperty</span> on/off (OutboxRelay 컨벤션 답습)</li>
+      <li class="must"><span class="box"></span><span class="tag">MUST</span><b>입장 토큰 발급</b> — <span class="term">SET entry-token:{userId} {token} EX {ttl}</span> (예: 5분). 순번 조회 응답에 포함되어 유저에게 전달</li>
+      <li class="must"><span class="box"></span><span class="tag">MUST</span><b>주문 진입 시 토큰 검증</b> — 주문 컨트롤러 앞단에서 토큰 확인 → 없으면 거부. FCFS <span class="term">Gatekeeper.tryPass()</span> 진입부 호출 패턴 참고</li>
+      <li class="must"><span class="box"></span><span class="tag">MUST</span><b>주문 완료 후 토큰 삭제</b> — <span class="term">DEL entry-token:{userId}</span> (재사용 차단)</li>
+      <li class="must"><span class="box"></span><span class="tag">MUST</span><b>배치 크기 산정 근거 문서화</b> — 처리량 기준으로 스케줄러 배치 크기 산정 (아래 계산)</li>
+    </ul>
+
+    <div class="note key">
+      <span class="tag">처리량 설계 기준 — 예시가 아니라 실제 수치로</span>
+      요구사항 예시: <strong>DB 커넥션 풀 50 · 주문 1건 200ms → 이론 최대 250 TPS → 안전 마진 70% = 175 TPS → 100ms마다 ~18명 발급</strong>. 단 이 수치를 그대로 베끼지 말고 <strong>우리 프로젝트의 실제 Hikari 풀 크기·주문 처리 시간</strong>으로 다시 산정해 Writing Log에 근거를 남깁니다.
+    </div>
+
+    <div class="note warn">
+      <span class="tag">⚠ 토큰 미사용 = 자리만 차지</span>
+      토큰 받고 주문 안 하면 그 슬롯이 낭비됩니다. <strong>TTL 만료 처리는 필수</strong>이고, 만료된 토큰 수만큼 다음 유저에게 추가 발급하는 로직이 필요합니다.
+    </div>
+  </section>
+
+  <!-- ===================== S4 ===================== -->
+  <section id="s4" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">4</div>
+      <div><p class="sec-eyebrow">STEP 3 · REAL-TIME POSITION</p><h2 class="sec">실시간 순번 조회 (Polling)</h2></div>
+    </div>
+
+    <p class="lead">대기열의 성패는 <strong>유저가 기다리는 동안 이탈하지 않느냐</strong>에 달려 있습니다. 순번이 안 보이면 유저는 새로고침하거나 떠납니다. 순번만 주는 것보다 <em>"약 N분 남았습니다"</em>가 훨씬 효과적입니다.</p>
+
+    <ul class="checklist">
+      <li class="must"><span class="box"></span><span class="tag">MUST</span><b>예상 대기 시간 계산</b> — <span class="term">내 순번 / 초당 처리량</span>. 추정값이므로 "약 N분/초" 표현</li>
+      <li class="must"><span class="box"></span><span class="tag">MUST</span><b>Polling 응답 통합</b> — <span class="term">{ position, estimatedWaitSeconds, token? }</span>. 순번 0 도달 시 토큰 포함 반환</li>
+      <li class="must"><span class="box"></span><span class="tag">MUST</span><b>Polling 부하 고려</b> — 대기 인원 × 조회 주기 = 초당 조회량. Redis라 감당 가능하나 근거 명시</li>
+    </ul>
+
+    <div class="cols">
+      <div class="col o">
+        <h4><span class="mk">NOW</span> Polling</h4>
+        <p>클라이언트가 1~3초마다 순번을 질의. 구현 단순·인프라 변경 없음. 대기 인원이 많으면 Polling 자체가 부하 + 주기만큼 지연. <b>이번 라운드는 여기서 시작.</b></p>
+      </div>
+      <div class="col x">
+        <h4><span class="mk">NEXT</span> SSE</h4>
+        <p>서버가 순번 변경 시점에만 Push. 불필요한 요청 없음. 대기 인원 × 커넥션 유지 필요. <b>Polling 부하가 문제 될 때 전환</b>(Nice-To-Have). WebSocket은 단방향이면 충분해 과도.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== S5 ===================== -->
+  <section id="s5" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">5</div>
+      <div><p class="sec-eyebrow">VERIFICATION</p><h2 class="sec">검증 — 통과해야 할 3가지</h2></div>
+    </div>
+
+    <p class="lead">과제 체크리스트가 명시한 검증 항목입니다. 각각을 재현 가능한 테스트로 남깁니다 — 동시성 검증은 R7 <span class="term">CouponIssueGatekeeperIntegrationTest</span>의 <span class="term">runConcurrently</span> 선례를 재사용합니다.</p>
+
+    <ul class="checklist">
+      <li class="must"><span class="box"></span><span class="tag">TEST</span><b>동시 진입</b> — 동시 N명 진입 → 대기열 순서가 <b>진입 시각 순으로 정확히</b> 보장되는가</li>
+      <li class="must"><span class="box"></span><span class="tag">TEST</span><b>토큰 만료</b> — TTL 초과 시 토큰이 무효화되고, 만료분만큼 다음 유저에게 재발급되는가</li>
+      <li class="must"><span class="box"></span><span class="tag">TEST</span><b>처리량 초과</b> — 배치 크기 이상 요청이 들어와도 하류(주문 API)가 안정적인가 (Thundering Herd 완화 검증)</li>
+    </ul>
+  </section>
+
+  <!-- ===================== S6 ===================== -->
+  <section id="s6" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">6</div>
+      <div><p class="sec-eyebrow">HIDDEN RISKS</p><h2 class="sec">숨은 리스크 — Thundering Herd · 장애 · 지표</h2></div>
+    </div>
+
+    <p class="lead">대기열을 만들었다고 끝이 아닙니다. <strong>대기열은 피크를 평탄화할 뿐 부하를 없애지 않습니다.</strong> 토큰을 한 번에 쏟으면 원래 문제의 축소판이 재발합니다.</p>
+
+    <h3>Thundering Herd — 토큰 발급 직후의 함정</h3>
+    <p>스케줄러가 1초에 175명에게 토큰을 몰아 발급하면 175명이 <strong>동시에</strong> 주문 API를 때립니다. 완화 3종:</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>전략</th><th>내용</th><th>효과</th></tr></thead>
+        <tbody>
+          <tr><td>발급 간격 분산</td><td>1초 175명 대신 100ms마다 ~18명</td><td>부하 10배 평탄화</td></tr>
+          <tr><td>토큰 Jitter</td><td>활성화 시점에 랜덤 딜레이(0~2s)</td><td>진입 시점 자연 분산</td></tr>
+          <tr><td>주문 API Rate Limit</td><td>토큰 있어도 초당 N건까지만</td><td>하류 최종 안전장치</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Graceful Degradation — Redis가 죽으면?</h3>
+    <div class="note q">
+      <span class="ask">대기열의 핵심 인프라인 Redis가 죽으면 우리 서비스는 어떻게 동작해야 하는가?</span>
+      전면 차단(안전·중단) / 대기열 우회(유지·과부하 위험) / Fallback 큐(순번 정확성↓·유지) — <strong>정답은 없습니다.</strong> 중요한 건 장애 <b>전에</b> 이 계약을 정의해두는 것. 주문은 쿠폰보다 정합성에 민감하므로 우회 허용은 신중해야 합니다.
+    </div>
+
+    <h3>운영 지표 — 장애 전에 감지하려면</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>지표</th><th>설명</th><th>왜 중요</th></tr></thead>
+        <tbody>
+          <tr><td>Queue Depth</td><td>현재 대기 인원 (ZCARD)</td><td>유입 &gt; 처리량 신호</td></tr>
+          <tr><td>Avg / P99 Wait</td><td>진입→토큰 발급 대기 시간</td><td>체감 품질 · 병목 시점</td></tr>
+          <tr><td>Token Conversion</td><td>토큰 발급→주문 완료 비율</td><td>&lt;50%면 TTL/UX 문제</td></tr>
+          <tr><td>Token Expiry</td><td>토큰 만료(이탈) 비율</td><td>&gt;30%면 대기 중 포기</td></tr>
+          <tr><td>Scheduler Health</td><td>스케줄러 마지막 실행 시각</td><td>1분+ 미실행이면 큐 정지</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note">
+      <span class="tag">비즈니스 지표</span>
+      <strong>Token Conversion Rate · Token Expiry Rate</strong>는 단순 시스템 지표가 아니라 비즈니스 지표입니다. 유저가 토큰을 받고도 주문 안 하면 대기 시간이 너무 길거나 TTL이 안 맞는다는 뜻입니다.
+    </div>
+  </section>
+
+  <!-- ===================== S7 ===================== -->
+  <section id="s7" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">7</div>
+      <div><p class="sec-eyebrow">REUSE · R7 CONNECTION</p><h2 class="sec">Round 7과의 연결점 (재사용 자산)</h2></div>
+    </div>
+
+    <p class="lead">대기열은 주문 API <strong>앞단</strong>의 관문이고, 주문 <em>이후</em>는 R7에서 구축한 이벤트 파이프라인이 그대로 동작합니다. 아래 자산은 <strong>새로 만들지 않고 재사용</strong>합니다 — 가장 강력한 청사진은 선착순 쿠폰(Redis 게이트 + 비동기 처리 + 결과 폴링)입니다.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>필요 기능</th><th>재사용 자산</th><th>경로</th></tr></thead>
+        <tbody>
+          <tr><td>주문 진입점</td><td>OrderController.order / OrderFacade.place</td><td>order/interfaces · application</td></tr>
+          <tr><td>Redis 원자 연산</td><td>masterRedisTemplate · Lua 패턴</td><td>modules/redis · coupon/…/redis</td></tr>
+          <tr><td>비동기 접수 + 폴링</td><td>선착순 쿠폰 전체 흐름</td><td>coupon/**</td></tr>
+          <tr><td>배치 스케줄러</td><td>@Scheduled 폴링 릴레이</td><td>OutboxRelay · PaymentReconciler</td></tr>
+          <tr><td>이벤트 발행/구독</td><td>ApplicationEvent · Outbox · Kafka</td><td>outbox/** · commerce-streamer</td></tr>
+          <tr><td>테스트 인프라</td><td>Redis Testcontainers 픽스처</td><td>modules/redis/testFixtures</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note key">
+      <span class="tag">배치 위치 판단</span>
+      쿠폰 FCFS가 <span class="term">coupon</span> 독립 도메인으로 <span class="term">infrastructure/redis</span> + <span class="term">infrastructure/messaging</span>를 나눈 선례가 있습니다. 대기열은 신규 <span class="term">com.loopers.queue.{domain,application,infrastructure,interfaces}</span> 도메인으로 두고 이 레이어 구조를 답습하는 것이 가장 안전합니다 (최종 결정은 Writing Log).
+    </div>
+  </section>
+
+  <!-- ===================== S8 ===================== -->
+  <section id="s8" class="fade">
+    <div class="sec-head">
+      <div class="sec-num">8</div>
+      <div><p class="sec-eyebrow">WRITING · SUBMISSION</p><h2 class="sec">Technical Writing · 제출</h2></div>
+    </div>
+
+    <p class="lead">구현과 별개로 <strong>글쓰기 자산</strong>이 제출물입니다. GitHub Issue 4포맷 중 1개 + 블로그 글. "무엇을 했다"가 아니라 <strong>"왜 그렇게 판단했나"</strong> 중심으로 씁니다.</p>
+
+    <ul class="checklist">
+      <li class="must"><span class="box"></span><span class="tag">SUBMIT</span><b>GitHub Issue</b> — Design Doc / Retrospective / Challenge Story / Benchmark Report 중 1개</li>
+      <li class="must"><span class="box"></span><span class="tag">SUBMIT</span><b>블로그 글</b> — TL;DR 필수. 코드 비교·흐름도·전후 예시 자유</li>
+    </ul>
+
+    <div class="note">
+      <span class="tag">주제 후보 (왜 중심)</span>
+      Rate Limiting vs Queuing 선택 근거 · 스케줄러 배치 크기 산정 근거 · Thundering Herd 완화 · Redis 장애 시 서비스 동작 · Polling vs SSE 선택 · 토큰 TTL 기준. → 결정 시점마다 <span class="term">experiments/WRITING-LOG.md</span>에 축적.
+    </div>
+
+    <a class="xlink" href="checklist.md">
+      <span class="ic">→</span>
+      <span><span class="t">실행 체크리스트</span><span class="h">구현 체크리스트 — Step 1·2·3 + 검증 + 열린 결정<small>재사용 자산 매핑과 진입 전 확정할 5개 결정 포함.</small></span></span>
+    </a>
+    <a class="xlink" href="experiments/WRITING-LOG.md">
+      <span class="ic">→</span>
+      <span><span class="t">의사결정 로그</span><span class="h">Writing Log — 왜 그렇게 판단했나<small>글쓰기 소재이자 결정 근거 축적. 결정 시점에 기록.</small></span></span>
+    </a>
+  </section>
+
+  </main>
+
+  <footer>
+    <span class="gl">⁂</span>
+    Round 8 요구사항 정리 — 주문 대기열 · 입장 토큰 · 실시간 순번<br>
+    무엇을 · 합격 기준 · 판단할 것 중심 명세 · 실행은 checklist.md · 결정은 experiments/WRITING-LOG.md
+  </footer>
+
+</div>
+
+<script>
+  const bar=document.getElementById('bar');
+  const onScroll=()=>{const h=document.documentElement;const sc=h.scrollTop/(h.scrollHeight-h.clientHeight);bar.style.width=(sc*100)+'%';};
+  document.addEventListener('scroll',onScroll,{passive:true});onScroll();
+  const obs=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');obs.unobserve(e.target);}});},{threshold:.08,rootMargin:'0px 0px -40px 0px'});
+  document.querySelectorAll('.fade').forEach(s=>obs.observe(s));
+</script>
+
+</body>
+</html>
